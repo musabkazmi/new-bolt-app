@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import Layout from './components/Layout';
 import Login from './components/Login';
+import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import Dashboard from './components/Dashboard';
 import MenuPage from './components/MenuPage';
@@ -31,12 +32,14 @@ function AppContent() {
     );
   }
 
-  // If no user, show login immediately
+  // If no user, show login/auth routes
   if (!user) {
     return (
       <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="*" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }
@@ -81,7 +84,12 @@ function AppContent() {
         <Route path="/inventory" element={<div className="p-8 text-center text-gray-500">Inventory view coming soon...</div>} />
         <Route path="/cart" element={<div className="p-8 text-center text-gray-500">Cart/checkout coming soon...</div>} />
         <Route path="/ai" element={<AIAgent />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        
+        {/* Auth routes should redirect to dashboard if user is logged in */}
+        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/dashboard" replace />} />
+        
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Layout>

@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Users, LogIn, UserPlus, AlertCircle, Info, Mail, ArrowLeft } from 'lucide-react';
+import { Users, LogIn, UserPlus, AlertCircle, Info, Mail } from 'lucide-react';
 import LanguageSelector from './LanguageSelector';
-import { supabase } from '../lib/supabase';
 
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -15,12 +14,18 @@ export default function Login() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState('');
-  const [resetError, setResetError] = useState('');
   const { signIn, signUp } = useAuth();
   const { t } = useLanguage();
+  const location = useLocation();
+
+  // Check for success message from password reset
+  React.useEffect(() => {
+    if (location.state?.message) {
+      setSuccess(location.state.message);
+      // Clear the state to prevent the message from persisting
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,52 +91,6 @@ export default function Login() {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setResetError('');
-    setResetSuccess('');
-    setResetLoading(true);
-
-    if (!resetEmail.trim()) {
-      setResetError('Please enter your email address');
-      setResetLoading(false);
-      return;
-    }
-
-    if (!resetEmail.includes('@')) {
-      setResetError('Please enter a valid email address');
-      setResetLoading(false);
-      return;
-    }
-
-    try {
-      console.log('Sending password reset email to:', resetEmail);
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) {
-        console.error('Password reset error:', error);
-        setResetError(error.message || 'Failed to send reset email. Please try again.');
-      } else {
-        setResetSuccess('Password reset link sent! Check your email and follow the instructions to reset your password.');
-        setResetEmail('');
-        
-        // Auto-close forgot password form after success
-        setTimeout(() => {
-          setShowForgotPassword(false);
-          setResetSuccess('');
-        }, 5000);
-      }
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      setResetError('An unexpected error occurred. Please try again.');
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
   const roleColors = {
     manager: 'from-blue-500 to-blue-600',
     waiter: 'from-green-500 to-green-600',
@@ -139,96 +98,6 @@ export default function Login() {
     customer: 'from-purple-500 to-purple-600',
     bar: 'from-pink-500 to-pink-600'
   };
-
-  // Forgot Password Form
-  if (showForgotPassword) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-8 text-white text-center relative">
-              {/* Language Selector */}
-              <div className="absolute top-4 right-4">
-                <LanguageSelector variant="compact" />
-              </div>
-              
-              <Mail className="w-16 h-16 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold">Reset Password</h1>
-              <p className="opacity-90 mt-2">Enter your email to receive a reset link</p>
-            </div>
-            
-            <form onSubmit={handleForgotPassword} className="p-8 space-y-6">
-              {/* Success Message */}
-              {resetSuccess && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-green-700 font-medium">{resetSuccess}</p>
-                      <p className="text-green-600 text-sm mt-1">
-                        If you don't see the email, check your spam folder.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {resetError && (
-                <div className="p-3 rounded-lg text-sm border bg-red-50 border-red-200 text-red-700 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <div>{resetError}</div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={resetLoading}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                {resetLoading ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    <Mail className="w-5 h-5" />
-                    Send Reset Link
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForgotPassword(false);
-                  setResetError('');
-                  setResetSuccess('');
-                  setResetEmail('');
-                }}
-                className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Sign In
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
@@ -375,13 +244,13 @@ export default function Login() {
             {/* Forgot Password Link */}
             {!isSignUp && (
               <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                <Link
+                  to="/forgot-password"
+                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors text-sm"
                 >
+                  <Mail className="w-4 h-4" />
                   Forgot your password?
-                </button>
+                </Link>
               </div>
             )}
 

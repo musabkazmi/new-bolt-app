@@ -1,28 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import LanguageSelector from './LanguageSelector';
+import { useLanguage } from '../contexts/LanguageContext';
+import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, Mail, ArrowLeft } from 'lucide-react';
 
 export default function ResetPassword() {
-  const [password, setPassword] = useState('');
+  const [searchParams] = useSearchParams();
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [isValidSession, setIsValidSession] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [validSession, setValidSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendSuccess, setResendSuccess] = useState('');
-  
+  const [resendingLink, setResendingLink] = useState(false);
+  const [email, setEmail] = useState('');
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const location = useLocation();
-  const { resetPassword } = useAuth();
+  const { t } = useLanguage();
 
   useEffect(() => {
     checkResetSession();
@@ -30,112 +26,108 @@ export default function ResetPassword() {
 
   const checkResetSession = async () => {
     try {
-      console.log('Checking reset session...');
-      
-      // Check for error parameters in the URL hash
-      const hashParams = new URLSearchParams(location.hash.substring(1));
-      const errorCode = hashParams.get('error_code');
-      const errorDescription = hashParams.get('error_description');
-      
-      if (errorCode === 'otp_expired' || errorCode === 'access_denied') {
-        console.error('Reset link expired or invalid:', errorDescription);
-        setError(errorDescription || 'Your password reset link has expired or is invalid. Please request a new one.');
-        setCheckingSession(false);
-        return;
-      }
-      
-      // Check if we have the required URL parameters for password reset
+      setCheckingSession(true);
+      setError('');
+
+      // Get tokens from URL parameters
       const accessToken = searchParams.get('access_token');
       const refreshToken = searchParams.get('refresh_token');
       const type = searchParams.get('type');
 
-      console.log('URL params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+      console.log('Reset password URL params:', { 
+        hasAccessToken: !!accessToken, 
+        hasRefreshToken: !!refreshToken, 
+        type 
+      });
 
-      if (type === 'recovery' && accessToken && refreshToken) {
-        // Set the session using the tokens from the URL
-        const { data, error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (error) {
-          console.error('Error setting session:', error);
-          setError('Invalid or expired reset link. Please request a new password reset.');
-        } else if (data.session) {
-          console.log('Valid reset session established');
-          setIsValidSession(true);
-          
-          // Get user email for potential resend
-          if (data.user) {
-            setResetEmail(data.user.email || '');
-          }
-        } else {
-          setError('Invalid reset session. Please request a new password reset.');
-        }
-      } else {
-        // Check if user has an active session (maybe they're already logged in)
-        const { data: { session, user } } = await supabase.auth.getSession();
-        
-        if (session) {
-          console.log('User has active session');
-          setIsValidSession(true);
-          if (user) {
-            setResetEmail(user.email || '');
-          }
-        } else {
-          setError('No valid reset session found. Please request a new password reset.');
-        }
+      // Check if this is a password recovery request
+      if (type !== 'recovery' || !accessToken || !refreshToken) {
+        console.log('Invalid or missing recovery tokens');
+        setError('Invalid or expired reset link. Please request a new password reset.');
+        setCheckingSession(false);
+        return;
       }
-    } catch (err) {
-      console.error('Error checking reset session:', err);
-      setError('An error occurred while verifying your reset link.');
+
+      // Set the session with the tokens from the URL
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        setError('Reset link has expired or is invalid. Please request a new password reset.');
+        setCheckingSession(false);
+        return;
+      }
+
+      if (sessionData.session && sessionData.user) {
+        console.log('Valid session established for password reset');
+        setValidSession(true);
+        setEmail(sessionData.user.email || '');
+      } else {
+        console.log('No valid session could be established');
+        setError('Unable to verify reset link. Please request a new password reset.');
+      }
+
+    } catch (error: any) {
+      console.error('Error checking reset session:', error);
+      setError('An error occurred while verifying your reset link. Please try again.');
     } finally {
       setCheckingSession(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    // Validation
-    if (!password.trim()) {
-      setError('Please enter a new password');
+    
+    if (!validSession) {
+      setError('Invalid session. Please request a new password reset.');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
-
-    setLoading(true);
 
     try {
-      console.log('Updating user password...');
-      
-      const { error } = await resetPassword(password);
+      setLoading(true);
+      setError('');
 
-      if (error) {
-        console.error('Password update error:', error);
-        setError(error.message || 'Failed to update password. Please try again.');
-      } else {
-        setSuccess('Password updated successfully! You will be redirected to the login page.');
-        
-        // Sign out the user and redirect to login after a delay
-        setTimeout(async () => {
-          await supabase.auth.signOut();
-          navigate('/');
-        }, 3000);
+      console.log('Updating password...');
+
+      // Update the user's password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) {
+        console.error('Password update error:', updateError);
+        setError(updateError.message || 'Failed to update password. Please try again.');
+        return;
       }
-    } catch (err) {
-      console.error('Unexpected error:', err);
+
+      console.log('Password updated successfully');
+      setSuccess('Password updated successfully! You will be redirected to login.');
+
+      // Sign out the user and redirect to login after a delay
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        navigate('/login', { 
+          state: { 
+            message: 'Password updated successfully. Please sign in with your new password.' 
+          }
+        });
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Error updating password:', error);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -143,125 +135,49 @@ export default function ResetPassword() {
   };
 
   const handleResendResetLink = async () => {
-    if (!resetEmail) {
-      setError('No email address available for resending the reset link');
+    if (!email) {
+      setError('Email address not available. Please go back to login and request a new reset.');
       return;
     }
 
-    setResendLoading(true);
-    setResendSuccess('');
-    setError('');
-
     try {
-      console.log('Resending password reset email to:', resetEmail);
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      setResendingLink(true);
+      setError('');
+
+      console.log('Resending password reset link to:', email);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
       });
 
       if (error) {
-        console.error('Error resending reset email:', error);
-        setError(error.message || 'Failed to resend reset email. Please try again.');
-      } else {
-        setResendSuccess('New password reset link sent! Check your email inbox.');
+        console.error('Error resending reset link:', error);
+        setError(error.message || 'Failed to send reset link. Please try again.');
+        return;
       }
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      setError('An unexpected error occurred. Please try again.');
+
+      setSuccess('New reset link sent! Please check your email.');
+
+    } catch (error: any) {
+      console.error('Error resending reset link:', error);
+      setError('Failed to send reset link. Please try again.');
     } finally {
-      setResendLoading(false);
+      setResendingLink(false);
     }
   };
 
-  const handleBackToLogin = () => {
-    navigate('/');
+  const goToLogin = () => {
+    navigate('/login');
   };
 
-  // Loading state while checking session
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-8 text-white text-center">
-              <Lock className="w-16 h-16 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold">Verifying Reset Link</h1>
-              <p className="opacity-90 mt-2">Please wait while we verify your password reset link...</p>
-            </div>
-            <div className="p-8 text-center">
-              <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Invalid session state
-  if (!isValidSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-red-500 to-red-600 p-8 text-white text-center relative">
-              <div className="absolute top-4 right-4">
-                <LanguageSelector variant="compact" />
-              </div>
-              <AlertCircle className="w-16 h-16 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold">Invalid Reset Link</h1>
-              <p className="opacity-90 mt-2">This password reset link is invalid or has expired</p>
-            </div>
-            <div className="p-8 space-y-6">
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-red-700">{error}</p>
-                  </div>
-                </div>
-              )}
-              
-              {resendSuccess && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-green-700">{resendSuccess}</p>
-                  </div>
-                </div>
-              )}
-              
-              <div className="text-center space-y-4">
-                <p className="text-gray-600">
-                  The password reset link you used is either invalid or has expired. 
-                  Please request a new password reset from the login page.
-                </p>
-                
-                {resetEmail && (
-                  <button
-                    onClick={handleResendResetLink}
-                    disabled={resendLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                  >
-                    {resendLoading ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-5 h-5" />
-                        Resend Reset Link to {resetEmail}
-                      </>
-                    )}
-                  </button>
-                )}
-                
-                <button
-                  onClick={handleBackToLogin}
-                  className="w-full flex items-center justify-center gap-2 bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                  Back to Login
-                </button>
-              </div>
-            </div>
+          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-6"></div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Verifying Reset Link</h2>
+            <p className="text-gray-600">Please wait while we verify your password reset link...</p>
           </div>
         </div>
       </div>
@@ -269,129 +185,171 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-green-500 to-green-600 p-8 text-white text-center relative">
-            <div className="absolute top-4 right-4">
-              <LanguageSelector variant="compact" />
-            </div>
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-8 text-white text-center">
             <Lock className="w-16 h-16 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold">Reset Your Password</h1>
-            <p className="opacity-90 mt-2">Enter your new password below</p>
+            <h1 className="text-2xl font-bold">Reset Password</h1>
+            <p className="opacity-90 mt-2">
+              {validSession ? 'Enter your new password below' : 'Reset link verification'}
+            </p>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
-            {/* Success Message */}
-            {success && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-green-700 font-medium">{success}</p>
-                    <p className="text-green-600 text-sm mt-1">
-                      Redirecting you to the login page...
-                    </p>
-                  </div>
+          <div className="p-8">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                  <p className="text-red-700">{error}</p>
                 </div>
               </div>
             )}
 
-            {/* Error Message */}
-            {error && (
-              <div className="p-3 rounded-lg text-sm border bg-red-50 border-red-200 text-red-700 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <div>{error}</div>
+            {/* Success Message */}
+            {success && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <p className="text-green-700">{success}</p>
+                </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                New Password *
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your new password (min 6 characters)"
-                  className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  required
-                  minLength={6}
-                />
+            {validSession ? (
+              /* Password Reset Form */
+              <form onSubmit={handlePasswordReset} className="space-y-6">
+                {email && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm text-blue-800">Resetting password for: {email}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter your new password"
+                      className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm your new password"
+                      className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  type="submit"
+                  disabled={loading || !newPassword || !confirmPassword}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <Lock className="w-5 h-5" />
+                      Update Password
+                    </>
+                  )}
                 </button>
+              </form>
+            ) : (
+              /* Invalid Session - Show Options */
+              <div className="text-center space-y-6">
+                <div className="p-6 bg-gray-50 rounded-lg">
+                  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">Reset Link Invalid</h3>
+                  <p className="text-gray-600 text-sm">
+                    Your password reset link has expired or is invalid. This can happen if:
+                  </p>
+                  <ul className="text-gray-600 text-sm mt-2 space-y-1">
+                    <li>• The link is older than 1 hour</li>
+                    <li>• The link has already been used</li>
+                    <li>• The link was not properly formatted</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-3">
+                  {email && (
+                    <button
+                      onClick={handleResendResetLink}
+                      disabled={resendingLink}
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                      {resendingLink ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <Mail className="w-5 h-5" />
+                          Send New Reset Link
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={goToLogin}
+                    className="w-full border border-gray-300 text-gray-700 p-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                    Back to Login
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Supabase Configuration Instructions */}
+            <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-yellow-800 mb-2">⚠️ Configuration Required</h4>
+              <div className="text-xs text-yellow-700 space-y-1">
+                <p><strong>To fix password reset issues, update your Supabase settings:</strong></p>
+                <p>1. Go to Supabase Dashboard → Authentication → URL Configuration</p>
+                <p>2. Set Site URL to: <code className="bg-yellow-100 px-1 rounded">{window.location.origin}</code></p>
+                <p>3. Add Redirect URL: <code className="bg-yellow-100 px-1 rounded">{window.location.origin}/reset-password</code></p>
+                <p>4. Save changes and test the reset flow again</p>
               </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm New Password *
-              </label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm your new password"
-                  className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Password Requirements */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">Password Requirements:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li className={`flex items-center gap-2 ${password.length >= 6 ? 'text-green-700' : ''}`}>
-                  <div className={`w-2 h-2 rounded-full ${password.length >= 6 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                  At least 6 characters long
-                </li>
-                <li className={`flex items-center gap-2 ${password === confirmPassword && password.length > 0 ? 'text-green-700' : ''}`}>
-                  <div className={`w-2 h-2 rounded-full ${password === confirmPassword && password.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                  Passwords match
-                </li>
-              </ul>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !password || !confirmPassword || password !== confirmPassword}
-              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  <Lock className="w-5 h-5" />
-                  Update Password
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleBackToLogin}
-              className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Login
-            </button>
-          </form>
+          </div>
         </div>
       </div>
     </div>
