@@ -32,6 +32,11 @@ function AppContent() {
     );
   }
 
+  // Special handling for reset password page - always show it regardless of auth state
+  if (window.location.pathname === '/reset-password') {
+    return <ResetPassword />;
+  }
+
   // If no user, show login/auth routes
   if (!user) {
     return (
@@ -88,7 +93,7 @@ function AppContent() {
         {/* Auth routes should redirect to dashboard if user is logged in */}
         <Route path="/login" element={<Navigate to="/dashboard" replace />} />
         <Route path="/forgot-password" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/reset-password" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

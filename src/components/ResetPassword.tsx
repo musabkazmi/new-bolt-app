@@ -14,24 +14,24 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [validSession, setValidSession] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [validRecoveryToken, setValidRecoveryToken] = useState(false);
+  const [checkingToken, setCheckingToken] = useState(true);
   const [resendingLink, setResendingLink] = useState(false);
   const [email, setEmail] = useState('');
+  const [recoverySession, setRecoverySession] = useState<any>(null);
   const navigate = useNavigate();
   const { t } = useLanguage();
 
   useEffect(() => {
-    checkResetSession();
+    checkRecoveryToken();
   }, []);
 
-  const checkResetSession = async () => {
+  const checkRecoveryToken = async () => {
     try {
-      setCheckingSession(true);
+      setCheckingToken(true);
       setError('');
 
       // Get tokens from URL hash or parameters
-      // First check the hash fragment (for older Supabase links)
       const hash = location.hash;
       let accessToken = '';
       let refreshToken = '';
@@ -44,13 +44,13 @@ export default function ResetPassword() {
         refreshToken = hashParams.get('refresh_token') || '';
         type = hashParams.get('type') || '';
       } else {
-        // Check URL parameters (for newer Supabase links)
+        // Check URL parameters
         accessToken = searchParams.get('access_token') || '';
         refreshToken = searchParams.get('refresh_token') || '';
         type = searchParams.get('type') || '';
       }
 
-      console.log('Reset password tokens:', { 
+      console.log('Recovery token check:', { 
         hasAccessToken: !!accessToken, 
         hasRefreshToken: !!refreshToken, 
         type,
@@ -61,44 +61,61 @@ export default function ResetPassword() {
       if (type !== 'recovery' || !accessToken || !refreshToken) {
         console.log('Invalid or missing recovery tokens');
         setError('Invalid or expired reset link. Please request a new password reset.');
-        setCheckingSession(false);
+        setCheckingToken(false);
         return;
       }
 
-      // Set the session with the tokens from the URL
-      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
+      // Validate the recovery session WITHOUT fully signing in
+      // We'll use the tokens to verify they're valid but not set them as the active session
+      try {
+        // Create a temporary client to test the tokens
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
 
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-        setError('Reset link has expired or is invalid. Please request a new password reset.');
-        setCheckingSession(false);
-        return;
-      }
+        if (sessionError) {
+          console.error('Recovery session error:', sessionError);
+          setError('Reset link has expired or is invalid. Please request a new password reset.');
+          setCheckingToken(false);
+          return;
+        }
 
-      if (sessionData.session && sessionData.user) {
-        console.log('Valid session established for password reset');
-        setValidSession(true);
-        setEmail(sessionData.user.email || '');
-      } else {
-        console.log('No valid session could be established');
-        setError('Unable to verify reset link. Please request a new password reset.');
+        if (sessionData.session && sessionData.user) {
+          console.log('Valid recovery session established');
+          
+          // Store the recovery session data but don't keep the user logged in
+          setRecoverySession(sessionData.session);
+          setValidRecoveryToken(true);
+          setEmail(sessionData.user.email || '');
+          
+          // Important: Sign out immediately to prevent auto-login
+          // The user should only be able to reset their password, not be logged in
+          await supabase.auth.signOut();
+          
+          console.log('Recovery token validated, user signed out for security');
+        } else {
+          console.log('No valid session could be established');
+          setError('Unable to verify reset link. Please request a new password reset.');
+        }
+
+      } catch (error: any) {
+        console.error('Error validating recovery session:', error);
+        setError('An error occurred while verifying your reset link. Please try again.');
       }
 
     } catch (error: any) {
-      console.error('Error checking reset session:', error);
+      console.error('Error checking recovery token:', error);
       setError('An error occurred while verifying your reset link. Please try again.');
     } finally {
-      setCheckingSession(false);
+      setCheckingToken(false);
     }
   };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validSession) {
+    if (!validRecoveryToken || !recoverySession) {
       setError('Invalid session. Please request a new password reset.');
       return;
     }
@@ -117,7 +134,19 @@ export default function ResetPassword() {
       setLoading(true);
       setError('');
 
-      console.log('Updating password...');
+      console.log('Updating password with recovery session...');
+
+      // First, re-establish the session temporarily to update the password
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: recoverySession.access_token,
+        refresh_token: recoverySession.refresh_token
+      });
+
+      if (sessionError) {
+        console.error('Error re-establishing session:', sessionError);
+        setError('Session expired. Please request a new password reset.');
+        return;
+      }
 
       // Update the user's password
       const { error: updateError } = await supabase.auth.updateUser({
@@ -131,11 +160,14 @@ export default function ResetPassword() {
       }
 
       console.log('Password updated successfully');
+      
+      // Important: Sign out the user after password update
+      await supabase.auth.signOut();
+      
       setSuccess('Password updated successfully! You will be redirected to login.');
 
-      // Sign out the user and redirect to login after a delay
-      setTimeout(async () => {
-        await supabase.auth.signOut();
+      // Redirect to login after a delay
+      setTimeout(() => {
         navigate('/login', { 
           state: { 
             message: 'Password updated successfully. Please sign in with your new password.' 
@@ -187,7 +219,7 @@ export default function ResetPassword() {
     navigate('/login');
   };
 
-  if (checkingSession) {
+  if (checkingToken) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
@@ -209,7 +241,7 @@ export default function ResetPassword() {
             <Lock className="w-16 h-16 mx-auto mb-4" />
             <h1 className="text-2xl font-bold">Reset Password</h1>
             <p className="opacity-90 mt-2">
-              {validSession ? 'Enter your new password below' : 'Reset link verification'}
+              {validRecoveryToken ? 'Enter your new password below' : 'Reset link verification'}
             </p>
           </div>
           
@@ -234,7 +266,7 @@ export default function ResetPassword() {
               </div>
             )}
 
-            {validSession ? (
+            {validRecoveryToken ? (
               /* Password Reset Form */
               <form onSubmit={handlePasswordReset} className="space-y-6">
                 {email && (
@@ -357,13 +389,14 @@ export default function ResetPassword() {
 
             {/* Supabase Configuration Instructions */}
             <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h4 className="text-sm font-semibold text-yellow-800 mb-2">⚠️ Configuration Required</h4>
+              <h4 className="text-sm font-semibold text-yellow-800 mb-2">⚙️ Supabase Configuration</h4>
               <div className="text-xs text-yellow-700 space-y-1">
-                <p><strong>To fix password reset issues, update your Supabase settings:</strong></p>
+                <p><strong>For password reset to work properly:</strong></p>
                 <p>1. Go to Supabase Dashboard → Authentication → URL Configuration</p>
                 <p>2. Set Site URL to: <code className="bg-yellow-100 px-1 rounded">{window.location.origin}</code></p>
                 <p>3. Add Redirect URL: <code className="bg-yellow-100 px-1 rounded">{window.location.origin}/reset-password</code></p>
-                <p>4. Save changes and test the reset flow again</p>
+                <p>4. Remove any localhost URLs from the configuration</p>
+                <p>5. Save changes and test the reset flow again</p>
               </div>
             </div>
           </div>

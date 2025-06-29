@@ -68,6 +68,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           
+          // IMPORTANT: Don't auto-login during password recovery
+          // Check if this is a password recovery session
+          if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+            // Check if we're on the reset password page
+            const isResetPasswordPage = window.location.pathname === '/reset-password';
+            
+            if (isResetPasswordPage) {
+              console.log('Password recovery session detected, not auto-logging in');
+              // Don't set the user or session during password recovery
+              setSession(null);
+              setUser(null);
+              setLoading(false);
+              return;
+            }
+          }
+          
           setSession(session);
           if (session?.user) {
             await fetchUserProfile(session.user.id);
