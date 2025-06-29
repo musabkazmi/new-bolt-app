@@ -15,6 +15,7 @@ import AddMenuItem from './components/AddMenuItem';
 import SalesReport from './components/SalesReport';
 import TableView from './components/TableView';
 import QuickOrderModal from './components/QuickOrderModal';
+import DrinkOrdersPage from './components/DrinkOrdersPage';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -81,7 +82,9 @@ function AppContent() {
         } />
         <Route path="/tables" element={<TableView />} />
         <Route path="/my-orders" element={<OrdersPage />} />
-        <Route path="/pending-orders" element={<OrdersPage />} />
+        <Route path="/pending-orders" element={
+          user.role === 'bar' ? <DrinkOrdersPage /> : <OrdersPage />
+        } />
         <Route path="/completed" element={<div className="p-8 text-center text-gray-500">Completed dishes coming soon...</div>} />
         <Route path="/inventory" element={<div className="p-8 text-center text-gray-500">Inventory view coming soon...</div>} />
         <Route path="/cart" element={<div className="p-8 text-center text-gray-500">Cart/checkout coming soon...</div>} />

@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Wine, Clock, CheckCircle2, AlertTriangle, Bell, Volume2, VolumeX } from 'lucide-react';
-import { supabase, Order, OrderItem } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { Wine, Clock, CheckCircle2, AlertCircle, Bell, Volume2, VolumeX, RefreshCw } from 'lucide-react';
+import { supabase, Order, OrderItem } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
-export default function BarDashboard() {
+export default function DrinkOrdersPage() {
   const [drinkOrders, setDrinkOrders] = useState<(Order & { order_items: (OrderItem & { menu_item: any })[] })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [stats, setStats] = useState({
-    pendingDrinks: 0,
-    completedToday: 0,
-    avgPrepTime: 5,
-    activeTables: 0
-  });
   const { user } = useAuth();
   const { t } = useLanguage();
 
@@ -21,20 +16,18 @@ export default function BarDashboard() {
     // Only load data if user exists and is bar staff
     if (user && user.role === 'bar') {
       loadDrinkOrders();
-      loadStats();
       
       // Set up real-time subscription for new drink orders
       const subscription = supabase
-        .channel('bar-orders')
+        .channel('drink-orders-page')
         .on('postgres_changes', 
           { 
             event: '*', 
             schema: 'public', 
-            table: 'order_items',
-            filter: 'menu_item.category=in.(Drink,Beverage,Alcohol,Coffee,Tea,Wine,Beer,Cocktail)'
+            table: 'order_items'
           }, 
           (payload) => {
-            console.log('New drink order detected:', payload);
+            console.log('Order item change detected:', payload);
             if (soundEnabled && payload.eventType === 'INSERT') {
               playNotificationSound();
             }
@@ -83,9 +76,10 @@ export default function BarDashboard() {
     }
 
     try {
-      console.log('Loading drink orders for bar staff...');
+      setError('');
+      console.log('Loading drink orders for Drink Orders page...');
 
-      // Get orders that contain drink items
+      // Get all orders that might contain drink items
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -95,17 +89,16 @@ export default function BarDashboard() {
             menu_item:menu_items (*)
           )
         `)
-        .in('status', ['pending', 'preparing', 'ready'])
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading orders:', error);
+        setError('Failed to load drink orders. Please try again.');
         setLoading(false);
         return;
       }
 
       console.log('All orders loaded:', data?.length || 0);
-      console.log('Sample order items:', data?.[0]?.order_items);
 
       // Filter orders to only include those with drink items
       // Define drink categories in lowercase for case-insensitive comparison
@@ -145,68 +138,11 @@ export default function BarDashboard() {
       
       setDrinkOrders(ordersWithDrinks);
 
-      // Calculate stats
-      const pendingDrinks = ordersWithDrinks.reduce((count, order) => 
-        count + order.order_items.filter(item => item.status === 'pending').length, 0
-      );
-      
-      const activeTables = new Set(ordersWithDrinks.map(order => order.table_number).filter(Boolean)).size;
-
-      setStats(prev => ({
-        ...prev,
-        pendingDrinks,
-        activeTables
-      }));
-
     } catch (error) {
       console.error('Error loading drink orders:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadStats = async () => {
-    if (!user || user.role !== 'bar') {
-      return;
-    }
-
-    try {
-      // Load today's completed drink orders
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const { data, error } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          menu_item:menu_items (*),
-          order:orders (*)
-        `)
-        .eq('status', 'ready')
-        .gte('created_at', today.toISOString());
-
-      if (error) {
-        console.error('Error loading stats:', error);
-        return;
-      }
-
-      // Filter for drink items only
-      const drinkCategories = ['drink', 'beverage', 'alcohol', 'coffee', 'tea', 'wine', 'beer', 'cocktail'];
-      const completedDrinks = (data || []).filter(item => 
-        item.menu_item && drinkCategories.some(category => 
-          (item.menu_item.category || '').toLowerCase().includes(category.toLowerCase())
-        )
-      );
-
-      console.log('Completed drinks today:', completedDrinks.length);
-      
-      setStats(prev => ({ 
-        ...prev, 
-        completedToday: completedDrinks.length 
-      }));
-
-    } catch (error) {
-      console.error('Error loading stats:', error);
     }
   };
 
@@ -221,6 +157,7 @@ export default function BarDashboard() {
 
       if (error) {
         console.error('Error updating drink status:', error);
+        setError('Failed to update drink status. Please try again.');
         return;
       }
 
@@ -234,6 +171,7 @@ export default function BarDashboard() {
 
     } catch (error) {
       console.error('Error updating drink status:', error);
+      setError('Failed to update drink status. Please try again.');
     }
   };
 
@@ -263,9 +201,34 @@ export default function BarDashboard() {
     }
   };
 
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'preparing':
+        return 'bg-blue-100 text-blue-800';
+      case 'ready':
+        return 'bg-green-100 text-green-800';
+      case 'served':
+        return 'bg-purple-100 text-purple-800';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   // Don't show loading if user is not logged in or not bar staff
   if (!user || user.role !== 'bar') {
-    return null;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Denied</h3>
+          <p className="text-gray-600">Only bar staff can access drink orders.</p>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -280,8 +243,8 @@ export default function BarDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Bar Dashboard</h1>
-          <p className="text-gray-600">Manage drink orders and bar operations</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('nav.drinkOrders')}</h1>
+          <p className="text-gray-600">{t('dashboard.manageAllDrinkOrders')}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -291,82 +254,45 @@ export default function BarDashboard() {
                 ? 'bg-purple-600 text-white hover:bg-purple-700' 
                 : 'bg-gray-300 text-gray-600 hover:bg-gray-400'
             }`}
-            title={soundEnabled ? 'Disable notifications' : 'Enable notifications'}
+            title={soundEnabled ? t('bar.disableNotifications') : t('bar.enableNotifications')}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            {soundEnabled ? 'Sound On' : 'Sound Off'}
+            {soundEnabled ? t('bar.soundOn') : t('bar.soundOff')}
           </button>
-          <div className="text-sm text-gray-500">
-            {stats.pendingDrinks} drinks in queue
-          </div>
+          <button
+            onClick={loadDrinkOrders}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            {t('common.refresh')}
+          </button>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pending Drinks</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pendingDrinks}</p>
-            </div>
-            <div className="p-3 bg-purple-50 rounded-lg">
-              <Wine className="w-6 h-6 text-purple-600" />
-            </div>
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <p className="text-red-700">{error}</p>
           </div>
         </div>
+      )}
 
-        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Completed Today</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.completedToday}</p>
-            </div>
-            <div className="p-3 bg-green-50 rounded-lg">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Avg Prep Time</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.avgPrepTime}m</p>
-            </div>
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <Clock className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Tables</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.activeTables}</p>
-            </div>
-            <div className="p-3 bg-orange-50 rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Drink Orders Queue */}
+      {/* Drink Orders List */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100">
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Drink Orders Queue</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('bar.allDrinkOrders')}</h3>
             <div className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-purple-600" />
-              <span className="text-sm text-gray-600">Real-time updates</span>
+              <span className="text-sm text-gray-600">{t('bar.realTimeUpdates')}</span>
             </div>
           </div>
         </div>
         <div className="p-6">
           {drinkOrders.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {drinkOrders.map((order) => (
                 <div key={order.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-purple-50 to-purple-100">
                   <div className="flex items-center justify-between mb-3">
@@ -380,11 +306,16 @@ export default function BarDashboard() {
                       </div>
                       <div>
                         <h4 className="font-medium text-gray-900">Order #{order.id.slice(0, 8)}</h4>
-                        <p className="text-sm text-gray-500">{order.customer_name}</p>
+                        <p className="text-sm text-gray-500">{order.customer_name || t('common.guest')}</p>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(order.created_at).toLocaleTimeString()}
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getOrderStatusColor(order.status)}`}>
+                        {t(`orders.${order.status}`).toUpperCase()}
+                      </span>
+                      <div className="text-sm text-gray-500">
+                        {new Date(order.created_at).toLocaleTimeString()}
+                      </div>
                     </div>
                   </div>
                   
@@ -395,19 +326,19 @@ export default function BarDashboard() {
                           <div className="flex items-center gap-2">
                             <Wine className="w-4 h-4 text-purple-600" />
                             <span className="font-medium">
-                              {item.quantity}x {item.menu_item?.name || 'Unknown Drink'}
+                              {item.quantity}x {item.menu_item?.name || t('bar.unknownDrink')}
                             </span>
                           </div>
                           {item.notes && (
-                            <p className="text-sm text-gray-600 italic">Note: {item.notes}</p>
+                            <p className="text-sm text-gray-600 italic">{t('common.notes')}: {item.notes}</p>
                           )}
-                          <p className="text-sm text-gray-500">€{item.price.toFixed(2)} each</p>
+                          <p className="text-sm text-gray-500">€{item.price.toFixed(2)} {t('orders.each')}</p>
                         </div>
                         
                         <div className="flex items-center gap-3">
                           <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getDrinkStatusColor(item.status)}`}>
                             {getDrinkStatusIcon(item.status)}
-                            {item.status.toUpperCase()}
+                            {t(`orders.${item.status}`).toUpperCase()}
                           </span>
                           
                           <div className="flex gap-2">
@@ -416,7 +347,7 @@ export default function BarDashboard() {
                                 onClick={() => updateDrinkStatus(item.id, 'preparing')}
                                 className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
                               >
-                                Start
+                                {t('bar.start')}
                               </button>
                             )}
                             {item.status === 'preparing' && (
@@ -424,12 +355,12 @@ export default function BarDashboard() {
                                 onClick={() => updateDrinkStatus(item.id, 'ready')}
                                 className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
                               >
-                                Ready
+                                {t('bar.ready')}
                               </button>
                             )}
                             {item.status === 'ready' && (
                               <span className="px-3 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                                ✓ Ready for pickup
+                                ✓ {t('bar.readyForPickup')}
                               </span>
                             )}
                           </div>
@@ -444,35 +375,13 @@ export default function BarDashboard() {
             <div className="text-center py-12">
               <div className="bg-purple-50 rounded-xl p-8 max-w-md mx-auto">
                 <Wine className="w-16 h-16 text-purple-300 mx-auto mb-4" />
-                <h4 className="text-lg font-semibold text-gray-700 mb-2">No Drink Orders</h4>
+                <h4 className="text-lg font-semibold text-gray-700 mb-2">{t('bar.noDrinkOrders')}</h4>
                 <p className="text-gray-500 text-sm">
-                  All caught up! No pending drink orders at the moment.
+                  {t('bar.allCaughtUp')}
                 </p>
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Bar Tips */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-white/20 rounded-lg">
-            <Wine className="w-8 h-8" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-xl font-bold mb-2">Bar Operations Tips</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm opacity-90">
-              <div>
-                <p>• Mark drinks as "In Progress" when you start preparing</p>
-                <p>• Use "Ready" status when drinks are complete</p>
-              </div>
-              <div>
-                <p>• Sound notifications alert you to new orders</p>
-                <p>• Status updates sync with waiter dashboards</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
