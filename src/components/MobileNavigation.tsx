@@ -33,6 +33,7 @@ const navigationItems = {
     { path: '/dashboard', icon: Home, labelKey: 'nav.home' },
     { path: '/pending-orders', icon: Wine, labelKey: 'nav.drinks' },
     { path: '/bar-menu', icon: BookOpen, labelKey: 'nav.menu' },
+    { path: '/bar-inventory', icon: Package, labelKey: 'nav.stock' },
     { path: '/ai', icon: Bot, labelKey: 'nav.ai' },
   ],
   customer: [

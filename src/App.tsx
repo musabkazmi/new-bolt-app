@@ -17,6 +17,7 @@ import TableView from './components/TableView';
 import QuickOrderModal from './components/QuickOrderModal';
 import DrinkOrdersPage from './components/DrinkOrdersPage';
 import BarMenuPage from './components/BarMenuPage';
+import BarInventoryPage from './components/BarInventoryPage';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -87,6 +88,7 @@ function AppContent() {
           user.role === 'bar' ? <DrinkOrdersPage /> : <OrdersPage />
         } />
         <Route path="/bar-menu" element={<BarMenuPage />} />
+        <Route path="/bar-inventory" element={<BarInventoryPage />} />
         <Route path="/completed" element={<div className="p-8 text-center text-gray-500">Completed dishes coming soon...</div>} />
         <Route path="/inventory" element={<div className="p-8 text-center text-gray-500">Inventory view coming soon...</div>} />
         <Route path="/cart" element={<div className="p-8 text-center text-gray-500">Cart/checkout coming soon...</div>} />

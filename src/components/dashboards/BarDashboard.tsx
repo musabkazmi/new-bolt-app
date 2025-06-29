@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wine, Clock, CheckCircle2, AlertTriangle, Bell, Volume2, VolumeX, BookOpen } from 'lucide-react';
+import { Wine, Clock, CheckCircle2, AlertTriangle, Bell, Volume2, VolumeX, BookOpen, Package } from 'lucide-react';
 import { supabase, Order, OrderItem } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -13,7 +13,8 @@ export default function BarDashboard() {
     pendingDrinks: 0,
     completedToday: 0,
     avgPrepTime: 5,
-    activeTables: 0
+    activeTables: 0,
+    lowStockItems: 3
   });
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -212,6 +213,12 @@ export default function BarDashboard() {
         completedToday: completedDrinks.length 
       }));
 
+      // Get low stock items count (mock data for now)
+      setStats(prev => ({
+        ...prev,
+        lowStockItems: 3
+      }));
+
     } catch (error) {
       console.error('Error loading stats:', error);
     }
@@ -274,6 +281,10 @@ export default function BarDashboard() {
     navigate('/bar-menu');
   };
 
+  const navigateToInventory = () => {
+    navigate('/bar-inventory');
+  };
+
   // Don't show loading if user is not logged in or not bar staff
   if (!user || user.role !== 'bar') {
     return null;
@@ -313,6 +324,13 @@ export default function BarDashboard() {
           >
             <BookOpen className="w-4 h-4" />
             {t('bar.barMenu')}
+          </button>
+          <button
+            onClick={navigateToInventory}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Package className="w-4 h-4" />
+            Inventory
           </button>
           <div className="text-sm text-gray-500">
             {stats.pendingDrinks} drinks in queue
@@ -361,8 +379,8 @@ export default function BarDashboard() {
         <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Tables</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.activeTables}</p>
+              <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.lowStockItems}</p>
             </div>
             <div className="p-3 bg-orange-50 rounded-lg">
               <AlertTriangle className="w-6 h-6 text-orange-600" />
@@ -371,23 +389,47 @@ export default function BarDashboard() {
         </div>
       </div>
 
-      {/* Bar Menu Highlight */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-white/20 rounded-lg">
-            <BookOpen className="w-8 h-8" />
+      {/* Quick Access Buttons */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Bar Menu Highlight */}
+        <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-lg">
+              <BookOpen className="w-8 h-8" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold mb-2">Bar Menu</h3>
+              <p className="opacity-90 mb-4">
+                View all available beverages, drinks, and cocktails in our comprehensive bar menu.
+              </p>
+              <button 
+                onClick={navigateToBarMenu}
+                className="bg-white text-purple-600 px-6 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+              >
+                {t('bar.viewAllBeverages')}
+              </button>
+            </div>
           </div>
-          <div className="flex-1">
-            <h3 className="text-xl font-bold mb-2">Bar Menu</h3>
-            <p className="opacity-90 mb-4">
-              View all available beverages, drinks, and cocktails in our comprehensive bar menu.
-            </p>
-            <button 
-              onClick={navigateToBarMenu}
-              className="bg-white text-purple-600 px-6 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors"
-            >
-              {t('bar.viewAllBeverages')}
-            </button>
+        </div>
+
+        {/* Inventory Highlight */}
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-lg">
+              <Package className="w-8 h-8" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold mb-2">Bar Inventory</h3>
+              <p className="opacity-90 mb-4">
+                Manage your bar stock, track inventory levels, and get alerts for low stock items.
+              </p>
+              <button 
+                onClick={navigateToInventory}
+                className="bg-white text-blue-600 px-6 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+              >
+                Manage Inventory
+              </button>
+            </div>
           </div>
         </div>
       </div>
