@@ -178,6 +178,7 @@ const translations = {
     'dashboard.20MinutesAgo': '20 minutes ago',
     'dashboard.1HourAgo': '1 hour ago',
     'dashboard.ordersInQueue': 'orders in queue',
+    'dashboard.manageAllDrinkOrders': 'Manage all drink orders',
     
     // Orders
     'orders.title': 'Orders',
@@ -464,6 +465,20 @@ const translations = {
     'cart.title': 'Cart/Checkout',
     'cart.comingSoon': 'Cart/checkout coming soon...',
     
+    // Bar Dashboard
+    'bar.soundOn': 'Sound On',
+    'bar.soundOff': 'Sound Off',
+    'bar.enableNotifications': 'Enable notifications',
+    'bar.disableNotifications': 'Disable notifications',
+    'bar.start': 'Start',
+    'bar.ready': 'Ready',
+    'bar.readyForPickup': 'Ready for pickup',
+    'bar.unknownDrink': 'Unknown Drink',
+    'bar.noDrinkOrders': 'No Drink Orders',
+    'bar.allCaughtUp': 'All caught up! No pending drink orders at the moment.',
+    'bar.allDrinkOrders': 'All Drink Orders',
+    'bar.realTimeUpdates': 'Real-time updates',
+    
     // Errors and Messages
     'error.loadingFailed': 'Loading failed',
     'error.tryAgain': 'Try Again',
@@ -658,6 +673,7 @@ const translations = {
     'dashboard.20MinutesAgo': 'vor 20 Minuten',
     'dashboard.1HourAgo': 'vor 1 Stunde',
     'dashboard.ordersInQueue': 'Bestellungen in der Warteschlange',
+    'dashboard.manageAllDrinkOrders': 'Verwalten Sie alle Getränkebestellungen',
     
     // Orders
     'orders.title': 'Bestellungen',
@@ -943,6 +959,20 @@ const translations = {
     // Cart
     'cart.title': 'Warenkorb/Kasse',
     'cart.comingSoon': 'Warenkorb/Kasse kommt bald...',
+    
+    // Bar Dashboard
+    'bar.soundOn': 'Ton An',
+    'bar.soundOff': 'Ton Aus',
+    'bar.enableNotifications': 'Benachrichtigungen aktivieren',
+    'bar.disableNotifications': 'Benachrichtigungen deaktivieren',
+    'bar.start': 'Starten',
+    'bar.ready': 'Fertig',
+    'bar.readyForPickup': 'Bereit zur Abholung',
+    'bar.unknownDrink': 'Unbekanntes Getränk',
+    'bar.noDrinkOrders': 'Keine Getränkebestellungen',
+    'bar.allCaughtUp': 'Alles erledigt! Derzeit keine ausstehenden Getränkebestellungen.',
+    'bar.allDrinkOrders': 'Alle Getränkebestellungen',
+    'bar.realTimeUpdates': 'Echtzeit-Updates',
     
     // Errors and Messages
     'error.loadingFailed': 'Laden fehlgeschlagen',
