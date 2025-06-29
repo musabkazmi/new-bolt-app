@@ -27,6 +27,28 @@ export default function KitchenDashboard() {
     }
   }, [user]);
 
+  // Define drink categories in lowercase for case-insensitive comparison
+  const drinkCategories = ['drink', 'beverage', 'alcohol', 'coffee', 'tea', 'wine', 'beer', 'cocktail'];
+  
+  // Helper function to filter out drink items from an order
+  const filterOutDrinkItems = (order: any) => {
+    // Filter out drink items
+    const filteredItems = order.order_items?.filter(item => {
+      // Check if this item is NOT a drink
+      const isDrink = item.menu_item && drinkCategories.some(category => 
+        (item.menu_item.category || '').toLowerCase().includes(category.toLowerCase())
+      );
+      
+      // Keep items that are NOT drinks
+      return !isDrink;
+    }) || [];
+    
+    return {
+      ...order,
+      order_items: filteredItems
+    };
+  };
+
   const loadOrders = async () => {
     if (!user || user.role !== 'kitchen') {
       setLoading(false);
@@ -49,27 +71,8 @@ export default function KitchenDashboard() {
       if (error) {
         console.error('Error loading orders:', error);
       } else {
-        // Define drink categories in lowercase for case-insensitive comparison
-        const drinkCategories = ['drink', 'beverage', 'alcohol', 'coffee', 'tea', 'wine', 'beer', 'cocktail'];
-        
         // Filter out drink items from each order
-        const ordersWithFilteredItems = data?.map(order => {
-          // Filter out drink items
-          const filteredItems = order.order_items?.filter(item => {
-            // Check if this item is NOT a drink
-            const isDrink = item.menu_item && drinkCategories.some(category => 
-              (item.menu_item.category || '').toLowerCase().includes(category.toLowerCase())
-            );
-            
-            // Keep items that are NOT drinks
-            return !isDrink;
-          }) || [];
-          
-          return {
-            ...order,
-            order_items: filteredItems
-          };
-        }) || [];
+        const ordersWithFilteredItems = data?.map(filterOutDrinkItems) || [];
         
         // Only keep orders that still have items after filtering
         const ordersWithItems = ordersWithFilteredItems.filter(order => 
@@ -98,14 +101,28 @@ export default function KitchenDashboard() {
       
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          order_items (
+            *,
+            menu_item:menu_items (*)
+          )
+        `)
         .in('status', ['ready', 'served', 'completed'])
         .gte('created_at', today.toISOString());
 
       if (error) {
         console.error('Error loading stats:', error);
       } else {
-        setStats(prev => ({ ...prev, completedToday: data?.length || 0 }));
+        // Filter out drink items from each order
+        const ordersWithFilteredItems = data?.map(filterOutDrinkItems) || [];
+        
+        // Only count orders that have food items
+        const ordersWithFoodItems = ordersWithFilteredItems.filter(order => 
+          order.order_items && order.order_items.length > 0
+        );
+        
+        setStats(prev => ({ ...prev, completedToday: ordersWithFoodItems.length || 0 }));
       }
     } catch (error) {
       console.error('Error loading stats:', error);
