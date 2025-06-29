@@ -297,8 +297,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (error) {
-        console.error('Error signing out from Supabase:', error);
-        // Continue with local cleanup even if Supabase signOut fails
+        // Check if this is the specific "session not found" error
+        const isSessionNotFound = error.message?.includes('Session from session_id claim in JWT does not exist') || 
+                                 error.message?.includes('session_not_found');
+        
+        if (isSessionNotFound) {
+          console.warn('Session already invalidated on server - this is expected during logout:', error.message);
+        } else {
+          console.error('Error signing out from Supabase:', error);
+        }
+        // Continue with local cleanup regardless of the error type
       } else {
         console.log('Successfully signed out from Supabase');
       }
