@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Wine, Clock, CheckCircle2, AlertTriangle, Bell, Volume2, VolumeX } from 'lucide-react';
+import { Wine, Clock, CheckCircle2, AlertTriangle, Bell, Volume2, VolumeX, BookOpen } from 'lucide-react';
 import { supabase, Order, OrderItem } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function BarDashboard() {
   const [drinkOrders, setDrinkOrders] = useState<(Order & { order_items: (OrderItem & { menu_item: any })[] })[]>([]);
@@ -16,6 +17,7 @@ export default function BarDashboard() {
   });
   const { user } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Only load data if user exists and is bar staff
@@ -268,6 +270,10 @@ export default function BarDashboard() {
     }
   };
 
+  const navigateToBarMenu = () => {
+    navigate('/bar-menu');
+  };
+
   // Don't show loading if user is not logged in or not bar staff
   if (!user || user.role !== 'bar') {
     return null;
@@ -300,6 +306,13 @@ export default function BarDashboard() {
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             {soundEnabled ? 'Sound On' : 'Sound Off'}
+          </button>
+          <button
+            onClick={navigateToBarMenu}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <BookOpen className="w-4 h-4" />
+            {t('bar.barMenu')}
           </button>
           <div className="text-sm text-gray-500">
             {stats.pendingDrinks} drinks in queue
@@ -354,6 +367,27 @@ export default function BarDashboard() {
             <div className="p-3 bg-orange-50 rounded-lg">
               <AlertTriangle className="w-6 h-6 text-orange-600" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bar Menu Highlight */}
+      <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-white/20 rounded-lg">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-bold mb-2">Bar Menu</h3>
+            <p className="opacity-90 mb-4">
+              View all available beverages, drinks, and cocktails in our comprehensive bar menu.
+            </p>
+            <button 
+              onClick={navigateToBarMenu}
+              className="bg-white text-purple-600 px-6 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+            >
+              {t('bar.viewAllBeverages')}
+            </button>
           </div>
         </div>
       </div>

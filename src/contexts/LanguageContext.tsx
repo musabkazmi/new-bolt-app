@@ -122,6 +122,7 @@ const translations = {
     'nav.browseMenu': 'Browse Menu',
     'nav.drinkOrders': 'Drink Orders',
     'nav.barInventory': 'Bar Inventory',
+    'nav.barMenu': 'Bar Menu',
     
     // Navigation - Mobile (shorter labels)
     'nav.order': 'Order',
@@ -476,6 +477,8 @@ const translations = {
     'bar.allCaughtUp': 'All caught up! No pending drink orders at the moment.',
     'bar.allDrinkOrders': 'All Drink Orders',
     'bar.realTimeUpdates': 'Real-time updates',
+    'bar.barMenu': 'Bar Menu',
+    'bar.viewAllBeverages': 'View all beverages',
     
     // Errors and Messages
     'error.loadingFailed': 'Loading failed',
@@ -615,6 +618,7 @@ const translations = {
     'nav.browseMenu': 'Speisekarte durchsuchen',
     'nav.drinkOrders': 'Getränkebestellungen',
     'nav.barInventory': 'Bar-Lagerbestand',
+    'nav.barMenu': 'Bar-Menü',
     
     // Navigation - Mobile (shorter labels)
     'nav.order': 'Bestellen',
@@ -969,6 +973,8 @@ const translations = {
     'bar.allCaughtUp': 'Alles erledigt! Derzeit keine ausstehenden Getränkebestellungen.',
     'bar.allDrinkOrders': 'Alle Getränkebestellungen',
     'bar.realTimeUpdates': 'Echtzeit-Updates',
+    'bar.barMenu': 'Bar-Menü',
+    'bar.viewAllBeverages': 'Alle Getränke anzeigen',
     
     // Errors and Messages
     'error.loadingFailed': 'Laden fehlgeschlagen',
