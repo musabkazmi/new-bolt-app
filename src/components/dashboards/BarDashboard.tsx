@@ -6,8 +6,10 @@ import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function BarDashboard() {
   const [drinkOrders, setDrinkOrders] = useState<(Order & { order_items: (OrderItem & { menu_item: any })[] })[]>([]);
+  const [completedDrinkOrders, setCompletedDrinkOrders] = useState<(Order & { order_items: (OrderItem & { menu_item: any })[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
   const [stats, setStats] = useState({
     pendingDrinks: 0,
     completedToday: 0,
@@ -95,7 +97,6 @@ export default function BarDashboard() {
             menu_item:menu_items (*)
           )
         `)
-        .in('status', ['pending', 'preparing', 'ready'])
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -143,11 +144,23 @@ export default function BarDashboard() {
         console.log(`Order #${order.id.slice(0, 8)} has ${order.order_items.length} drink items`);
       });
       
-      setDrinkOrders(ordersWithDrinks);
+      // Separate pending/preparing orders from ready/completed orders
+      const pendingOrders = ordersWithDrinks.filter(order => 
+        order.status === 'pending' || order.status === 'preparing' || 
+        order.order_items.some(item => item.status === 'pending' || item.status === 'preparing')
+      );
+      
+      const completedOrders = ordersWithDrinks.filter(order => 
+        (order.status === 'ready' || order.status === 'served' || order.status === 'completed') &&
+        order.order_items.every(item => item.status === 'ready')
+      );
+      
+      setDrinkOrders(pendingOrders);
+      setCompletedDrinkOrders(completedOrders);
 
       // Calculate stats
-      const pendingDrinks = ordersWithDrinks.reduce((count, order) => 
-        count + order.order_items.filter(item => item.status === 'pending').length, 0
+      const pendingDrinks = pendingOrders.reduce((count, order) => 
+        count + order.order_items.filter(item => item.status === 'pending' || item.status === 'preparing').length, 0
       );
       
       const activeTables = new Set(ordersWithDrinks.map(order => order.table_number).filter(Boolean)).size;
@@ -353,103 +366,186 @@ export default function BarDashboard() {
         </div>
       </div>
 
-      {/* Drink Orders Queue */}
+      {/* Tabs for Pending and Completed Drinks */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Drink Orders Queue</h3>
-            <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-purple-600" />
-              <span className="text-sm text-gray-600">Real-time updates</span>
-            </div>
+        <div className="border-b border-gray-100">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-6 py-4 font-medium text-sm focus:outline-none ${
+                activeTab === 'pending'
+                  ? 'border-b-2 border-purple-600 text-purple-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Pending Drinks
+            </button>
+            <button
+              onClick={() => setActiveTab('completed')}
+              className={`px-6 py-4 font-medium text-sm focus:outline-none ${
+                activeTab === 'completed'
+                  ? 'border-b-2 border-purple-600 text-purple-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Completed Drinks
+            </button>
           </div>
         </div>
+
         <div className="p-6">
-          {drinkOrders.length > 0 ? (
-            <div className="space-y-4">
-              {drinkOrders.map((order) => (
-                <div key={order.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-purple-50 to-purple-100">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 bg-purple-600 text-white rounded-lg">
-                        {order.table_number ? (
-                          <span className="font-bold text-sm">T{order.table_number}</span>
-                        ) : (
-                          <Wine className="w-5 h-5" />
-                        )}
+          {activeTab === 'pending' ? (
+            // Pending Drinks Queue
+            drinkOrders.length > 0 ? (
+              <div className="space-y-4">
+                {drinkOrders.map((order) => (
+                  <div key={order.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-purple-50 to-purple-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-10 h-10 bg-purple-600 text-white rounded-lg">
+                          {order.table_number ? (
+                            <span className="font-bold text-sm">T{order.table_number}</span>
+                          ) : (
+                            <Wine className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-900">Order #{order.id.slice(0, 8)}</h4>
+                          <p className="text-sm text-gray-500">{order.customer_name}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Order #{order.id.slice(0, 8)}</h4>
-                        <p className="text-sm text-gray-500">{order.customer_name}</p>
+                      <div className="text-sm text-gray-500">
+                        {new Date(order.created_at).toLocaleTimeString()}
                       </div>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(order.created_at).toLocaleTimeString()}
+                    
+                    <div className="space-y-3">
+                      {order.order_items?.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-purple-200">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Wine className="w-4 h-4 text-purple-600" />
+                              <span className="font-medium">
+                                {item.quantity}x {item.menu_item?.name || 'Unknown Drink'}
+                              </span>
+                            </div>
+                            {item.notes && (
+                              <p className="text-sm text-gray-600 italic">Note: {item.notes}</p>
+                            )}
+                            <p className="text-sm text-gray-500">€{item.price.toFixed(2)} each</p>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getDrinkStatusColor(item.status)}`}>
+                              {getDrinkStatusIcon(item.status)}
+                              {item.status.toUpperCase()}
+                            </span>
+                            
+                            <div className="flex gap-2">
+                              {item.status === 'pending' && (
+                                <button
+                                  onClick={() => updateDrinkStatus(item.id, 'preparing')}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                                >
+                                  Start
+                                </button>
+                              )}
+                              {item.status === 'preparing' && (
+                                <button
+                                  onClick={() => updateDrinkStatus(item.id, 'ready')}
+                                  className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
+                                >
+                                  Ready
+                                </button>
+                              )}
+                              {item.status === 'ready' && (
+                                <span className="px-3 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                                  ✓ Ready for pickup
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  
-                  <div className="space-y-3">
-                    {order.order_items?.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-purple-200">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Wine className="w-4 h-4 text-purple-600" />
-                            <span className="font-medium">
-                              {item.quantity}x {item.menu_item?.name || 'Unknown Drink'}
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="bg-purple-50 rounded-xl p-8 max-w-md mx-auto">
+                  <Wine className="w-16 h-16 text-purple-300 mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold text-gray-700 mb-2">No Pending Drink Orders</h4>
+                  <p className="text-gray-500 text-sm">
+                    All caught up! No pending drink orders at the moment.
+                  </p>
+                </div>
+              </div>
+            )
+          ) : (
+            // Completed Drinks Tab
+            completedDrinkOrders.length > 0 ? (
+              <div className="space-y-4">
+                {completedDrinkOrders.map((order) => (
+                  <div key={order.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-green-50 to-green-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-10 h-10 bg-green-600 text-white rounded-lg">
+                          {order.table_number ? (
+                            <span className="font-bold text-sm">T{order.table_number}</span>
+                          ) : (
+                            <Wine className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-900">Order #{order.id.slice(0, 8)}</h4>
+                          <p className="text-sm text-gray-500">{order.customer_name}</p>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {new Date(order.created_at).toLocaleTimeString()}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {order.order_items?.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-green-200">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Wine className="w-4 h-4 text-green-600" />
+                              <span className="font-medium">
+                                {item.quantity}x {item.menu_item?.name || 'Unknown Drink'}
+                              </span>
+                            </div>
+                            {item.notes && (
+                              <p className="text-sm text-gray-600 italic">Note: {item.notes}</p>
+                            )}
+                            <p className="text-sm text-gray-500">€{item.price.toFixed(2)} each</p>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">
+                              <CheckCircle2 className="w-4 h-4" />
+                              COMPLETED
                             </span>
                           </div>
-                          {item.notes && (
-                            <p className="text-sm text-gray-600 italic">Note: {item.notes}</p>
-                          )}
-                          <p className="text-sm text-gray-500">€{item.price.toFixed(2)} each</p>
                         </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getDrinkStatusColor(item.status)}`}>
-                            {getDrinkStatusIcon(item.status)}
-                            {item.status.toUpperCase()}
-                          </span>
-                          
-                          <div className="flex gap-2">
-                            {item.status === 'pending' && (
-                              <button
-                                onClick={() => updateDrinkStatus(item.id, 'preparing')}
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-                              >
-                                Start
-                              </button>
-                            )}
-                            {item.status === 'preparing' && (
-                              <button
-                                onClick={() => updateDrinkStatus(item.id, 'ready')}
-                                className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
-                              >
-                                Ready
-                              </button>
-                            )}
-                            {item.status === 'ready' && (
-                              <span className="px-3 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                                ✓ Ready for pickup
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="bg-purple-50 rounded-xl p-8 max-w-md mx-auto">
-                <Wine className="w-16 h-16 text-purple-300 mx-auto mb-4" />
-                <h4 className="text-lg font-semibold text-gray-700 mb-2">No Drink Orders</h4>
-                <p className="text-gray-500 text-sm">
-                  All caught up! No pending drink orders at the moment.
-                </p>
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="bg-green-50 rounded-xl p-8 max-w-md mx-auto">
+                  <CheckCircle2 className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold text-gray-700 mb-2">No Completed Drinks</h4>
+                  <p className="text-gray-500 text-sm">
+                    No drinks have been completed yet today.
+                  </p>
+                </div>
+              </div>
+            )
           )}
         </div>
       </div>
