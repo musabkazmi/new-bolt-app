@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, Mail, ArrowLeft } from 'lucide-react';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,15 +30,31 @@ export default function ResetPassword() {
       setCheckingSession(true);
       setError('');
 
-      // Get tokens from URL parameters
-      const accessToken = searchParams.get('access_token');
-      const refreshToken = searchParams.get('refresh_token');
-      const type = searchParams.get('type');
+      // Get tokens from URL hash or parameters
+      // First check the hash fragment (for older Supabase links)
+      const hash = location.hash;
+      let accessToken = '';
+      let refreshToken = '';
+      let type = '';
 
-      console.log('Reset password URL params:', { 
+      if (hash) {
+        // Parse hash fragment
+        const hashParams = new URLSearchParams(hash.substring(1));
+        accessToken = hashParams.get('access_token') || '';
+        refreshToken = hashParams.get('refresh_token') || '';
+        type = hashParams.get('type') || '';
+      } else {
+        // Check URL parameters (for newer Supabase links)
+        accessToken = searchParams.get('access_token') || '';
+        refreshToken = searchParams.get('refresh_token') || '';
+        type = searchParams.get('type') || '';
+      }
+
+      console.log('Reset password tokens:', { 
         hasAccessToken: !!accessToken, 
         hasRefreshToken: !!refreshToken, 
-        type 
+        type,
+        source: hash ? 'hash fragment' : 'URL parameters'
       });
 
       // Check if this is a password recovery request
