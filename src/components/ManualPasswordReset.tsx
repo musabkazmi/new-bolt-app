@@ -222,6 +222,7 @@ export default function ManualPasswordReset() {
                 <p>This tool is for administrative use only and bypasses the normal password reset flow.</p>
                 <p>No email confirmation is sent to the user when their password is changed.</p>
                 <p>Use with caution and only for legitimate password recovery situations.</p>
+                <p>After resetting, manually inform the user of their new password via email, WhatsApp, or other means.</p>
               </div>
             </div>
           </form>
