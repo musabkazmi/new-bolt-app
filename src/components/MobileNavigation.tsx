@@ -26,14 +26,12 @@ const navigationItems = {
   kitchen: [
     { path: '/dashboard', icon: Home, labelKey: 'nav.home' },
     { path: '/pending-orders', icon: ClipboardList, labelKey: 'nav.pending' },
-    { path: '/completed', icon: ChefHat, labelKey: 'nav.done' },
     { path: '/inventory', icon: Package, labelKey: 'nav.stock' },
     { path: '/ai', icon: Bot, labelKey: 'nav.ai' },
   ],
   bar: [
     { path: '/dashboard', icon: Home, labelKey: 'nav.home' },
     { path: '/pending-orders', icon: Wine, labelKey: 'nav.drinks' },
-    { path: '/completed', icon: ChefHat, labelKey: 'nav.done' },
     { path: '/inventory', icon: Package, labelKey: 'nav.stock' },
     { path: '/ai', icon: Bot, labelKey: 'nav.ai' },
   ],

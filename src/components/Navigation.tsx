@@ -19,7 +19,6 @@ const navigationItems = {
     { path: '/staff', icon: Users, labelKey: 'nav.staffOverview' },
     { path: '/reports', icon: BarChart3, labelKey: 'nav.salesReports' },
     { path: '/pending-orders', icon: ClipboardList, labelKey: 'nav.pendingOrders' },
-    { path: '/completed', icon: ChefHat, labelKey: 'nav.completedDishes' },
     { path: '/inventory', icon: Package, labelKey: 'nav.inventoryView' },
     { path: '/cart', icon: ShoppingBag, labelKey: 'nav.cartCheckout' },
     { path: '/ai', icon: Bot, labelKey: 'nav.aiAgent' },
@@ -35,14 +34,12 @@ const navigationItems = {
   kitchen: [
     { path: '/dashboard', icon: Home, labelKey: 'nav.home' },
     { path: '/pending-orders', icon: ClipboardList, labelKey: 'nav.pendingOrders' },
-    { path: '/completed', icon: ChefHat, labelKey: 'nav.completedDishes' },
     { path: '/inventory', icon: Package, labelKey: 'nav.inventoryView' },
     { path: '/ai', icon: Bot, labelKey: 'nav.aiAgent' },
   ],
   bar: [
     { path: '/dashboard', icon: Home, labelKey: 'nav.home' },
     { path: '/pending-orders', icon: Wine, labelKey: 'nav.drinkOrders' },
-    { path: '/completed', icon: ChefHat, labelKey: 'nav.completedDrinks' },
     { path: '/inventory', icon: Package, labelKey: 'nav.barInventory' },
     { path: '/ai', icon: Bot, labelKey: 'nav.aiAgent' },
   ],
