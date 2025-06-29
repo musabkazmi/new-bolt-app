@@ -48,15 +48,15 @@ export default function ManualPasswordReset() {
         .from('users')
         .select('id')
         .eq('email', email)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle zero rows gracefully
 
       if (userError) {
         console.error('Error finding user:', userError);
-        setError(`User with email ${email} not found. Please check the email address.`);
+        setError(`Database error occurred while searching for user. Please try again.`);
         return;
       }
 
-      if (!userData || !userData.id) {
+      if (!userData) {
         setError(`User with email ${email} not found. Please check the email address.`);
         return;
       }
