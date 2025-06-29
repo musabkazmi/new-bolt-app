@@ -11,6 +11,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   clearAIChatHistory: () => Promise<void>;
+  resetPassword: (password: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -202,6 +203,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetPassword = async (password: string) => {
+    try {
+      console.log('Attempting to reset password');
+      
+      const { error } = await supabase.auth.updateUser({
+        password: password
+      });
+
+      if (error) {
+        console.error('Password reset error:', error);
+      } else {
+        console.log('Password reset successful');
+      }
+
+      return { error };
+    } catch (error) {
+      console.error('Error in resetPassword:', error);
+      return { error: error as AuthError };
+    }
+  };
+
   const clearAIChatHistory = async () => {
     if (!user) return;
 
@@ -309,6 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signOut,
       clearAIChatHistory,
+      resetPassword,
     }}>
       {children}
     </AuthContext.Provider>

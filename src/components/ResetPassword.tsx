@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import LanguageSelector from './LanguageSelector';
 
 export default function ResetPassword() {
@@ -17,6 +18,7 @@ export default function ResetPassword() {
   
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { resetPassword } = useAuth();
 
   useEffect(() => {
     checkResetSession();
@@ -94,9 +96,7 @@ export default function ResetPassword() {
     try {
       console.log('Updating user password...');
       
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
+      const { error } = await resetPassword(password);
 
       if (error) {
         console.error('Password update error:', error);
