@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Login from './components/Login';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import ManualPasswordReset from './components/ManualPasswordReset';
 import Dashboard from './components/Dashboard';
 import MenuPage from './components/MenuPage';
 import OrdersPage from './components/OrdersPage';
@@ -32,11 +33,6 @@ function AppContent() {
     );
   }
 
-  // Special handling for reset password page - always show it regardless of auth state
-  if (window.location.pathname === '/reset-password') {
-    return <ResetPassword />;
-  }
-
   // If no user, show login/auth routes
   if (!user) {
     return (
@@ -44,6 +40,7 @@ function AppContent() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/manual-reset" element={<ManualPasswordReset />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -89,6 +86,7 @@ function AppContent() {
         <Route path="/inventory" element={<div className="p-8 text-center text-gray-500">Inventory view coming soon...</div>} />
         <Route path="/cart" element={<div className="p-8 text-center text-gray-500">Cart/checkout coming soon...</div>} />
         <Route path="/ai" element={<AIAgent />} />
+        <Route path="/manual-reset" element={<ManualPasswordReset />} />
         
         {/* Auth routes should redirect to dashboard if user is logged in */}
         <Route path="/login" element={<Navigate to="/dashboard" replace />} />
