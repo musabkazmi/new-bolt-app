@@ -104,18 +104,45 @@ export default function BarDashboard() {
         return;
       }
 
-      // Filter orders to only include those with drink items
-      const drinkCategories = ['Drink', 'Beverage', 'Alcohol', 'Coffee', 'Tea', 'Wine', 'Beer', 'Cocktail'];
-      const ordersWithDrinks = (data || []).map(order => ({
-        ...order,
-        order_items: (order.order_items || []).filter(item => 
-          item.menu_item && drinkCategories.some(category => 
-            item.menu_item.category.toLowerCase().includes(category.toLowerCase())
-          )
-        )
-      })).filter(order => order.order_items.length > 0);
+      console.log('All orders loaded:', data?.length || 0);
+      console.log('Sample order items:', data?.[0]?.order_items);
 
-      console.log('Drink orders loaded:', ordersWithDrinks.length);
+      // Filter orders to only include those with drink items
+      // Define drink categories in lowercase for case-insensitive comparison
+      const drinkCategories = ['drink', 'beverage', 'alcohol', 'coffee', 'tea', 'wine', 'beer', 'cocktail'];
+      
+      const ordersWithDrinks = (data || []).map(order => {
+        // Log each order's items for debugging
+        console.log(`Order #${order.id.slice(0, 8)} items:`, order.order_items?.map(item => ({
+          name: item.menu_item?.name,
+          category: item.menu_item?.category,
+          isDrink: item.menu_item && drinkCategories.some(category => 
+            (item.menu_item.category || '').toLowerCase().includes(category)
+          )
+        })));
+        
+        return {
+          ...order,
+          order_items: (order.order_items || []).filter(item => {
+            // Check if this item is a drink
+            const isDrink = item.menu_item && drinkCategories.some(category => 
+              (item.menu_item.category || '').toLowerCase().includes(category.toLowerCase())
+            );
+            
+            if (isDrink) {
+              console.log(`Found drink item: ${item.menu_item?.name} (${item.menu_item?.category})`);
+            }
+            
+            return isDrink;
+          })
+        };
+      }).filter(order => order.order_items.length > 0);
+
+      console.log('Drink orders filtered:', ordersWithDrinks.length);
+      ordersWithDrinks.forEach(order => {
+        console.log(`Order #${order.id.slice(0, 8)} has ${order.order_items.length} drink items`);
+      });
+      
       setDrinkOrders(ordersWithDrinks);
 
       // Calculate stats
@@ -164,13 +191,15 @@ export default function BarDashboard() {
       }
 
       // Filter for drink items only
-      const drinkCategories = ['Drink', 'Beverage', 'Alcohol', 'Coffee', 'Tea', 'Wine', 'Beer', 'Cocktail'];
+      const drinkCategories = ['drink', 'beverage', 'alcohol', 'coffee', 'tea', 'wine', 'beer', 'cocktail'];
       const completedDrinks = (data || []).filter(item => 
         item.menu_item && drinkCategories.some(category => 
-          item.menu_item.category.toLowerCase().includes(category.toLowerCase())
+          (item.menu_item.category || '').toLowerCase().includes(category.toLowerCase())
         )
       );
 
+      console.log('Completed drinks today:', completedDrinks.length);
+      
       setStats(prev => ({ 
         ...prev, 
         completedToday: completedDrinks.length 
