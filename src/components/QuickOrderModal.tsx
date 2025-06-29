@@ -145,7 +145,7 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
     if (supported) {
       initializeSpeechRecognition();
     } else {
-      setError('Spracherkennung wird in diesem Browser nicht unterstützt. Bitte verwenden Sie Chrome, Edge oder Safari.');
+      setError(t('voice.speechRecognitionNotSupported'));
     }
   };
 
@@ -162,18 +162,18 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
 
       if (error) {
         console.error('Error loading menu items:', error);
-        throw new Error(`Fehler beim Laden der Speisekarte: ${error.message}`);
+        throw new Error(`${t('error.failedToLoad')}: ${error.message}`);
       }
       
       console.log('Menu items loaded:', data?.length || 0);
       setMenuItems(data || []);
       
       if (!data || data.length === 0) {
-        setError('Keine Menüpunkte verfügbar. Bitte fügen Sie zuerst Menüpunkte hinzu.');
+        setError(t('error.noMenuItems'));
       }
     } catch (error: any) {
       console.error('Error loading menu items:', error);
-      setError(error.message || 'Fehler beim Laden der Speisekarte');
+      setError(error.message || t('error.failedToLoad'));
     }
   };
 
@@ -218,23 +218,23 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
 
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error, event);
-        let errorMessage = 'Spracherkennungsfehler';
+        let errorMessage = t('voice.speechRecognitionError');
         
         switch (event.error) {
           case 'not-allowed':
-            errorMessage = 'Mikrofonzugriff verweigert. Bitte erlauben Sie den Mikrofonzugriff und versuchen Sie es erneut.';
+            errorMessage = t('voice.microphoneRequired');
             break;
           case 'no-speech':
-            errorMessage = 'Keine Sprache erkannt. Bitte sprechen Sie deutlich und versuchen Sie es erneut.';
+            errorMessage = t('voice.noSpeechDetected');
             break;
           case 'audio-capture':
-            errorMessage = 'Kein Mikrofon gefunden. Bitte überprüfen Sie Ihre Mikrofonverbindung.';
+            errorMessage = t('voice.noMicrophoneFound');
             break;
           case 'network':
-            errorMessage = 'Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.';
+            errorMessage = t('error.networkError');
             break;
           default:
-            errorMessage = `Spracherkennungsfehler: ${event.error}`;
+            errorMessage = `${t('voice.speechRecognitionError')}: ${event.error}`;
         }
         
         setError(errorMessage);
@@ -250,7 +250,7 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
       console.log('Speech recognition initialized successfully');
     } catch (error) {
       console.error('Error initializing speech recognition:', error);
-      setError('Spracherkennung konnte nicht initialisiert werden');
+      setError(t('voice.failedToInitialize'));
     }
   };
 
@@ -282,7 +282,7 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
     } catch (error: any) {
       console.error('Microphone permission denied:', error);
       setPermissionGranted(false);
-      setError('Mikrofonzugriff ist für Sprachbestellungen erforderlich. Bitte erlauben Sie den Mikrofonzugriff in Ihren Browser-Einstellungen.');
+      setError(t('voice.microphoneRequired'));
       return false;
     }
   };
@@ -293,7 +293,7 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
       setTranscript('');
       
       if (!speechSupported) {
-        setError('Spracherkennung wird in diesem Browser nicht unterstützt');
+        setError(t('voice.speechRecognitionNotSupported'));
         return;
       }
 
@@ -338,7 +338,7 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
 
     } catch (error: any) {
       console.error('Error starting recording:', error);
-      setError(error.message || 'Aufnahme konnte nicht gestartet werden. Bitte überprüfen Sie die Mikrofonberechtigungen.');
+      setError(error.message || t('voice.failedToStartRecording'));
       setIsRecording(false);
     }
   };
@@ -382,13 +382,13 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
         audio.onerror = () => {
           setIsPlaying(false);
           URL.revokeObjectURL(audioUrl);
-          setError('Audio konnte nicht abgespielt werden');
+          setError(t('voice.failedToPlayAudio'));
         };
         
         audio.play();
       } catch (error) {
         console.error('Error playing audio:', error);
-        setError('Audio konnte nicht abgespielt werden');
+        setError(t('voice.failedToPlayAudio'));
       }
     }
   };
@@ -402,12 +402,12 @@ export default function QuickOrderModal({ isOpen, onClose, onOrderPlaced }: Quic
 
   const processVoiceOrder = async () => {
     if (!transcript.trim()) {
-      setError('Keine Sprache erkannt. Bitte versuchen Sie es erneut.');
+      setError(t('voice.noSpeechDetected'));
       return;
     }
 
     if (menuItems.length === 0) {
-      setError('Keine Menüpunkte verfügbar. Bitte stellen Sie sicher, dass Menüpunkte geladen sind.');
+      setError(t('voice.noMenuItemsAvailable'));
       return;
     }
 
@@ -491,17 +491,17 @@ WICHTIG:
         console.log('Successfully parsed order:', parsed);
         
         if (!parsed.items || !Array.isArray(parsed.items)) {
-          throw new Error('Ungültiges Bestellformat: Artikel-Array fehlt');
+          throw new Error(t('voice.invalidOrderFormat'));
         }
         
         if (parsed.items.length === 0) {
-          throw new Error('Keine Artikel in der Bestellung gefunden');
+          throw new Error(t('voice.noItemsFound'));
         }
         
       } catch (parseError) {
         console.error('Failed to parse AI response as JSON:', response.answer);
         console.error('Parse error:', parseError);
-        throw new Error('KI konnte die Bestellung nicht verstehen. Bitte versuchen Sie deutlicher zu sprechen oder verwenden Sie einfachere Sprache.');
+        throw new Error(t('voice.speakClearlyTryAgain'));
       }
 
       // Match parsed items with actual menu items
@@ -548,7 +548,7 @@ WICHTIG:
 
       const validItems = matchedItems.filter(item => item.menuItem);
       if (validItems.length === 0) {
-        throw new Error('Keine Menüpunkte konnten aus Ihrer Bestellung zugeordnet werden. Bitte versuchen Sie es mit klareren Artikelnamen erneut.');
+        throw new Error(t('voice.noValidMenuItems'));
       }
 
       // Recalculate totals
@@ -570,11 +570,11 @@ WICHTIG:
         setTableNumber(parsed.tableNumber.toString());
       }
 
-      setSuccess(`Bestellung erfolgreich analysiert! ${validItems.length} Artikel gefunden. Überprüfen und bestätigen Sie unten.`);
+      setSuccess(t('voice.orderParsedSuccessfully') + ' ' + t('voice.reviewAndConfirm'));
 
     } catch (error: any) {
       console.error('Error processing voice order:', error);
-      setError(error.message || 'Sprachbestellung konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.');
+      setError(error.message || t('voice.failedToProcessOrder'));
     } finally {
       setIsProcessing(false);
     }
@@ -582,7 +582,7 @@ WICHTIG:
 
   const generateGuestName = () => {
     const guestNumber = Math.floor(Math.random() * 9999) + 1;
-    return `Gast ${guestNumber}`;
+    return `${t('common.guest')} ${guestNumber}`;
   };
 
   const generateInvoiceNumber = () => {
@@ -596,13 +596,13 @@ WICHTIG:
 
   const createOrderAndInvoice = async () => {
     if (!parsedOrder || !user) {
-      setError('Keine Bestellung zu erstellen oder Benutzer nicht authentifiziert');
+      setError(t('voice.noOrderToCreate'));
       return;
     }
 
     const validItems = parsedOrder.items.filter(item => item.menuItem);
     if (validItems.length === 0) {
-      setError('Keine gültigen Menüpunkte in der Bestellung gefunden');
+      setError(t('voice.noValidMenuItemsFound'));
       return;
     }
 
@@ -614,7 +614,7 @@ WICHTIG:
 
       const tableNum = tableNumber ? parseInt(tableNumber) : null;
       if (tableNumber && (isNaN(tableNum) || tableNum <= 0)) {
-        setError('Bitte geben Sie eine gültige Tischnummer ein oder lassen Sie das Feld leer');
+        setError(t('orders.validTableNumber'));
         setIsCreatingOrder(false);
         return;
       }
@@ -641,7 +641,7 @@ WICHTIG:
 
       if (orderError) {
         console.error('Error creating order:', orderError);
-        throw new Error(`Bestellung konnte nicht erstellt werden: ${orderError.message}`);
+        throw new Error(`${t('error.failedToCreate')}: ${orderError.message}`);
       }
 
       console.log('Order created successfully:', createdOrder);
@@ -652,7 +652,7 @@ WICHTIG:
         menu_item_id: item.menuItem!.id,
         quantity: item.quantity,
         price: item.unitPrice,
-        notes: item.notes || parsedOrder.specialInstructions || `Sprachbestellung: "${transcript.slice(0, 100)}${transcript.length > 100 ? '...' : ''}"`,
+        notes: item.notes || parsedOrder.specialInstructions || `${t('voice.voiceOrder')}: "${transcript.slice(0, 100)}${transcript.length > 100 ? '...' : ''}"`,
         status: 'pending' as const
       }));
 
@@ -664,7 +664,7 @@ WICHTIG:
 
       if (itemsError) {
         console.error('Error creating order items:', itemsError);
-        throw new Error(`Artikel konnten nicht zur Bestellung hinzugefügt werden: ${itemsError.message}`);
+        throw new Error(`${t('error.failedToAddItems')}: ${itemsError.message}`);
       }
 
       console.log('Quick voice order created successfully!');
@@ -686,11 +686,11 @@ WICHTIG:
       };
 
       setInvoiceData(invoice);
-      setSuccess(`Sprachbestellung erfolgreich erstellt! Bestellung #${createdOrder.id.slice(0, 8)} - Gesamt: €${parsedOrder.grandTotal.toFixed(2)}`);
+      setSuccess(`${t('voice.voiceOrderCreated')} ${t('orders.orderNumber')}${createdOrder.id.slice(0, 8)} - ${t('common.total')}: €${parsedOrder.grandTotal.toFixed(2)}`);
 
     } catch (error: any) {
       console.error('Error creating order:', error);
-      setError(error.message || 'Bestellung konnte nicht erstellt werden');
+      setError(error.message || t('error.failedToCreate'));
     } finally {
       setIsCreatingOrder(false);
     }
@@ -715,10 +715,10 @@ WICHTIG:
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setSuccess('Rechnung erfolgreich generiert und heruntergeladen!');
+      setSuccess(t('quickOrder.invoiceGenerated'));
     } catch (error) {
       console.error('Error generating invoice:', error);
-      setError('Fehler beim Generieren der Rechnung');
+      setError(t('quickOrder.invoiceGenerationError'));
     } finally {
       setIsGeneratingInvoice(false);
     }
@@ -732,10 +732,10 @@ WICHTIG:
       console.log('Sending invoice email...');
 
       await sendInvoiceEmail(invoiceData, companyData, accountantEmail, ccEmail);
-      setSuccess('Rechnung erfolgreich per E-Mail an Steuerberater gesendet!');
+      setSuccess(t('quickOrder.invoiceEmailSent'));
     } catch (error) {
       console.error('Error sending email:', error);
-      setError('Fehler beim Versenden der E-Mail');
+      setError(t('quickOrder.emailSendingError'));
     } finally {
       setIsSendingEmail(false);
     }
@@ -760,10 +760,10 @@ WICHTIG:
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setSuccess('DATEV-Export erfolgreich generiert und heruntergeladen!');
+      setSuccess(t('quickOrder.datevExportGenerated'));
     } catch (error) {
       console.error('Error generating DATEV export:', error);
-      setError('Fehler beim Generieren des DATEV-Exports');
+      setError(t('quickOrder.datevExportError'));
     } finally {
       setIsExportingDATEV(false);
     }
@@ -787,15 +787,15 @@ WICHTIG:
                 <Mic className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold">Quick-Modus Sprachbestellung</h2>
-                <p className="opacity-90">Sprechen Sie Ihre Bestellung - automatische Rechnungsgenerierung</p>
+                <h2 className="text-2xl font-bold">{t('quickOrder.title')}</h2>
+                <p className="opacity-90">{t('quickOrder.subtitle')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowCompanySettings(true)}
                 className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Firmeninformationen bearbeiten"
+                title={t('quickOrder.editCompanyInfo')}
               >
                 <Settings className="w-5 h-5" />
               </button>
@@ -817,12 +817,12 @@ WICHTIG:
                 <AlertCircle className="w-5 h-5 text-red-600" />
                 <div className="flex-1">
                   <p className="text-red-700">{error}</p>
-                  {error.includes('Mikrofonzugriff') && (
+                  {error.includes(t('voice.microphoneRequired')) && (
                     <button
                       onClick={requestMicrophonePermission}
                       className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                     >
-                      Mikrofonzugriff gewähren
+                      {t('voice.grantMicrophoneAccess')}
                     </button>
                   )}
                 </div>
@@ -844,14 +844,14 @@ WICHTIG:
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Building className="w-5 h-5 text-blue-600" />
-                <span className="text-blue-800 font-medium">Firmeninformationen</span>
+                <span className="text-blue-800 font-medium">{t('quickOrder.companyInfo')}</span>
               </div>
               <button
                 onClick={() => setShowCompanySettings(true)}
                 className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
                 <Settings className="w-3 h-3" />
-                Bearbeiten
+                {t('common.edit')}
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -874,7 +874,7 @@ WICHTIG:
               <div className="flex items-center gap-2">
                 <Utensils className="w-5 h-5 text-blue-600" />
                 <span className="text-blue-800 font-medium">
-                  Speisekarten-Status: {menuItems.length} Artikel geladen
+                  {t('voice.menuStatus')}: {menuItems.length} {t('voice.itemsLoaded')}
                 </span>
               </div>
               <button
@@ -882,14 +882,14 @@ WICHTIG:
                 className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
                 <RefreshCw className="w-3 h-3" />
-                Aktualisieren
+                {t('common.refresh')}
               </button>
             </div>
           </div>
 
           {/* Voice Recording Section */}
           <div className="bg-gray-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Schritt 1: Bestellung aufnehmen</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('quickOrder.step1')}</h3>
             
             <div className="text-center">
               <div className={`w-32 h-32 mx-auto mb-4 rounded-full flex items-center justify-center transition-all duration-300 ${
@@ -912,7 +912,7 @@ WICHTIG:
                     className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Mic className="w-5 h-5" />
-                    Aufnahme starten
+                    {t('voice.startRecording')}
                   </button>
                 ) : (
                   <button
@@ -920,7 +920,7 @@ WICHTIG:
                     className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                   >
                     <MicOff className="w-5 h-5" />
-                    Aufnahme stoppen
+                    {t('voice.stopRecording')}
                   </button>
                 )}
 
@@ -932,7 +932,7 @@ WICHTIG:
                         className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         <Play className="w-5 h-5" />
-                        Abspielen
+                        {t('voice.play')}
                       </button>
                     ) : (
                       <button
@@ -940,7 +940,7 @@ WICHTIG:
                         className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         <Pause className="w-5 h-5" />
-                        Pause
+                        {t('voice.pause')}
                       </button>
                     )}
                   </>
@@ -951,24 +951,24 @@ WICHTIG:
                   className="flex items-center gap-2 px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 >
                   <RotateCcw className="w-5 h-5" />
-                  Zurücksetzen
+                  {t('voice.reset')}
                 </button>
               </div>
 
               <p className="text-sm text-gray-600 mb-4">
                 {isRecording 
-                  ? 'Hört zu... Sprechen Sie Ihre Bestellung deutlich' 
+                  ? t('voice.listening')
                   : speechSupported
-                    ? 'Klicken Sie "Aufnahme starten" und sprechen Sie Ihre Bestellung natürlich'
-                    : 'Spracherkennung in diesem Browser nicht verfügbar'
+                    ? t('quickOrder.startRecordingPrompt')
+                    : t('voice.speechNotSupported')
                 }
               </p>
 
               <div className="text-xs text-gray-500 bg-white p-3 rounded-lg">
-                <p className="font-medium mb-1">Beispielbestellungen:</p>
-                <p>"Zwei Bier, eine Currywurst mit Pommes, eine Fanta"</p>
-                <p>"Tisch 5 möchte zwei Margherita-Pizzen und einen Caesar-Salat"</p>
-                <p>"Ein gegrillter Lachs ohne Sauce und zwei Hausweine für Tisch 3"</p>
+                <p className="font-medium mb-1">{t('voice.exampleOrders')}:</p>
+                <p>{t('quickOrder.example1')}</p>
+                <p>{t('quickOrder.example2')}</p>
+                <p>{t('quickOrder.example3')}</p>
               </div>
             </div>
           </div>
@@ -976,7 +976,7 @@ WICHTIG:
           {/* Transcript Section */}
           {transcript && (
             <div className="bg-blue-50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Schritt 2: Transkript überprüfen</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('quickOrder.step2')}</h3>
               <div className="bg-white p-4 rounded-lg border border-blue-200">
                 <div className="flex items-start gap-2">
                   <Volume2 className="w-5 h-5 text-blue-600 mt-1" />
@@ -993,12 +993,12 @@ WICHTIG:
                   {isProcessing ? (
                     <>
                       <Loader className="w-5 h-5 animate-spin" />
-                      Wird mit KI verarbeitet...
+                      {t('voice.processing')}
                     </>
                   ) : (
                     <>
                       <Send className="w-5 h-5" />
-                      Bestellung mit KI verarbeiten
+                      {t('quickOrder.processWithAI')}
                     </>
                   )}
                 </button>
@@ -1009,20 +1009,20 @@ WICHTIG:
           {/* Parsed Order Section */}
           {parsedOrder && (
             <div className="bg-green-50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Schritt 3: Bestelldetails bestätigen</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('quickOrder.step3')}</h3>
               
               {/* Customer Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <User className="w-4 h-4 inline mr-1" />
-                    Kundenname (optional - generiert automatisch Gastnamen)
+                    {t('quickOrder.customerNameOptional')}
                   </label>
                   <input
                     type="text"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Kundennamen eingeben (optional)"
+                    placeholder={t('orders.enterCustomerName')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                   />
                 </div>
@@ -1030,13 +1030,13 @@ WICHTIG:
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <MapPin className="w-4 h-4 inline mr-1" />
-                    Tischnummer (optional)
+                    {t('quickOrder.tableNumberOptional')}
                   </label>
                   <input
                     type="number"
                     value={tableNumber}
                     onChange={(e) => setTableNumber(e.target.value)}
-                    placeholder="Tischnummer eingeben (optional)"
+                    placeholder={t('orders.enterTableNumber')}
                     min="1"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                   />
@@ -1045,7 +1045,7 @@ WICHTIG:
 
               {/* Order Items */}
               <div className="bg-white rounded-lg border border-green-200 p-4 mb-4">
-                <h4 className="font-medium text-gray-900 mb-3">Bestellartikel:</h4>
+                <h4 className="font-medium text-gray-900 mb-3">{t('quickOrder.orderItems')}:</h4>
                 <div className="space-y-3">
                   {parsedOrder.items.map((item, index) => (
                     <div key={index} className={`p-3 rounded-lg border ${
@@ -1061,17 +1061,17 @@ WICHTIG:
                             </span>
                             {!item.menuItem && (
                               <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                                Nicht auf Speisekarte
+                                {t('voice.notOnMenu')}
                               </span>
                             )}
                           </div>
                           {item.notes && (
-                            <p className="text-sm text-gray-600 italic">Notiz: {item.notes}</p>
+                            <p className="text-sm text-gray-600 italic">{t('common.notes')}: {item.notes}</p>
                           )}
                           {item.menuItem && (
                             <div className="text-sm text-gray-500 mt-1">
-                              <p>€{item.unitPrice.toFixed(2)} je Stück</p>
-                              <p>MwSt (19%): €{item.vatAmount.toFixed(2)}</p>
+                              <p>€{item.unitPrice.toFixed(2)} {t('orders.each')}</p>
+                              <p>{t('quickOrder.vat')} (19%): €{item.vatAmount.toFixed(2)}</p>
                             </div>
                           )}
                         </div>
@@ -1091,7 +1091,7 @@ WICHTIG:
               {/* Special Instructions */}
               {parsedOrder.specialInstructions && (
                 <div className="bg-white rounded-lg border border-green-200 p-4 mb-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Besondere Anweisungen:</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">{t('voice.specialInstructions')}:</h4>
                   <p className="text-gray-700">{parsedOrder.specialInstructions}</p>
                 </div>
               )}
@@ -1100,16 +1100,16 @@ WICHTIG:
               <div className="bg-white rounded-lg border border-green-200 p-4 mb-6">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span>Zwischensumme:</span>
+                    <span>{t('quickOrder.subtotal')}:</span>
                     <span>€{(parsedOrder.subtotal - parsedOrder.totalVat).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span>MwSt (19%):</span>
+                    <span>{t('quickOrder.vat')} (19%):</span>
                     <span>€{parsedOrder.totalVat.toFixed(2)}</span>
                   </div>
                   <div className="border-t border-gray-200 pt-2">
                     <div className="flex justify-between items-center text-lg font-bold">
-                      <span>Gesamtbetrag:</span>
+                      <span>{t('common.total')}:</span>
                       <span className="text-green-600">€{parsedOrder.grandTotal.toFixed(2)}</span>
                     </div>
                   </div>
@@ -1126,12 +1126,12 @@ WICHTIG:
                   {isCreatingOrder ? (
                     <>
                       <Loader className="w-5 h-5 animate-spin" />
-                      Bestellung wird erstellt...
+                      {t('voice.creating')}
                     </>
                   ) : (
                     <>
                       <ShoppingCart className="w-5 h-5" />
-                      Bestellung erstellen (€{calculateTotal().toFixed(2)})
+                      {t('quickOrder.createOrder')} (€{calculateTotal().toFixed(2)})
                     </>
                   )}
                 </button>
@@ -1142,27 +1142,27 @@ WICHTIG:
           {/* Invoice Section */}
           {invoiceData && (
             <div className="bg-yellow-50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Schritt 4: Rechnung generieren und versenden</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('quickOrder.step4')}</h3>
               
               <div className="bg-white rounded-lg border border-yellow-200 p-4 mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Receipt className="w-5 h-5 text-yellow-600" />
-                  <h4 className="font-medium text-gray-900">Rechnungsdetails</h4>
+                  <h4 className="font-medium text-gray-900">{t('quickOrder.invoiceDetails')}</h4>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p><strong>Rechnungsnummer:</strong> {invoiceData.invoiceNumber}</p>
-                    <p><strong>Datum:</strong> {invoiceData.date}</p>
-                    <p><strong>Kunde:</strong> {invoiceData.customerName}</p>
+                    <p><strong>{t('quickOrder.invoiceNumber')}:</strong> {invoiceData.invoiceNumber}</p>
+                    <p><strong>{t('common.date')}:</strong> {invoiceData.date}</p>
+                    <p><strong>{t('common.customer')}:</strong> {invoiceData.customerName}</p>
                     {invoiceData.tableNumber && (
-                      <p><strong>Tisch:</strong> {invoiceData.tableNumber}</p>
+                      <p><strong>{t('common.table')}:</strong> {invoiceData.tableNumber}</p>
                     )}
                   </div>
                   <div>
-                    <p><strong>Artikel:</strong> {invoiceData.items.length}</p>
-                    <p><strong>Netto:</strong> €{(invoiceData.subtotal - invoiceData.totalVat).toFixed(2)}</p>
-                    <p><strong>MwSt:</strong> €{invoiceData.totalVat.toFixed(2)}</p>
-                    <p><strong>Gesamt:</strong> €{invoiceData.grandTotal.toFixed(2)}</p>
+                    <p><strong>{t('common.items')}:</strong> {invoiceData.items.length}</p>
+                    <p><strong>{t('quickOrder.net')}:</strong> €{(invoiceData.subtotal - invoiceData.totalVat).toFixed(2)}</p>
+                    <p><strong>{t('quickOrder.vat')}:</strong> €{invoiceData.totalVat.toFixed(2)}</p>
+                    <p><strong>{t('common.total')}:</strong> €{invoiceData.grandTotal.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
@@ -1178,7 +1178,7 @@ WICHTIG:
                   ) : (
                     <FileText className="w-5 h-5" />
                   )}
-                  PDF Rechnung
+                  {t('quickOrder.pdfInvoice')}
                 </button>
 
                 <button
@@ -1191,7 +1191,7 @@ WICHTIG:
                   ) : (
                     <Mail className="w-5 h-5" />
                   )}
-                  E-Mail senden
+                  {t('quickOrder.sendEmail')}
                 </button>
 
                 <button
@@ -1204,13 +1204,13 @@ WICHTIG:
                   ) : (
                     <Download className="w-5 h-5" />
                   )}
-                  DATEV Export
+                  {t('quickOrder.datevExport')}
                 </button>
               </div>
 
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Automatischer Versand:</strong> Rechnung wird automatisch an {accountantEmail} gesendet (CC: {ccEmail})
+                  <strong>{t('quickOrder.automaticSending')}:</strong> {t('quickOrder.invoiceWillBeSent')} {accountantEmail} (CC: {ccEmail})
                 </p>
               </div>
             </div>
@@ -1221,7 +1221,7 @@ WICHTIG:
         <div className="border-t border-gray-200 p-4 bg-gray-50">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-600">
-              Quick-Modus: Sprache → KI-Analyse → Bestellung → Rechnung → E-Mail
+              {t('quickOrder.workflow')}
             </div>
             <button
               onClick={() => {
@@ -1232,7 +1232,7 @@ WICHTIG:
               }}
               className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
-              Schließen
+              {t('common.close')}
             </button>
           </div>
         </div>
