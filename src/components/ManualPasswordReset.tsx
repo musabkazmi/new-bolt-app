@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { AlertCircle, CheckCircle, Eye, EyeOff, Key, ArrowLeft } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, EyeOff, Key, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export default function ManualPasswordReset() {
   const [email, setEmail] = useState('');
@@ -12,6 +12,14 @@ export default function ManualPasswordReset() {
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if email was passed from the previous page
+    if (location.state?.email) {
+      setEmail(location.state.email);
+    }
+  }, [location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,29 +51,62 @@ export default function ManualPasswordReset() {
 
       console.log('Attempting to reset password for:', email);
       
-      // First, get the user ID from the email
-      const { data: userData, error: userError } = await supabase
+      // First, check if the user exists in auth.users
+      const { data: authUser, error: authError } = await supabase.auth.admin.getUserByEmail(email);
+
+      if (authError) {
+        console.error('Error finding user in auth:', authError);
+        setError(`Error finding user in auth system: ${authError.message}`);
+        return;
+      }
+
+      if (!authUser || !authUser.user) {
+        setError(`User with email ${email} not found in authentication system. Please check the email address.`);
+        return;
+      }
+
+      const userId = authUser.user.id;
+      console.log('User found in auth system, ID:', userId);
+
+      // Check if user exists in public.users table
+      const { data: profileData, error: profileError } = await supabase
         .from('users')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle(); // Use maybeSingle() instead of single() to handle zero rows gracefully
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-      if (userError) {
-        console.error('Error finding user:', userError);
-        setError(`Database error occurred while searching for user. Please try again.`);
-        return;
+      if (profileError) {
+        console.error('Error checking user profile:', profileError);
       }
 
-      if (!userData) {
-        setError(`User with email ${email} not found. Please check the email address.`);
-        return;
+      // If user doesn't exist in public.users, create the profile
+      if (!profileData) {
+        console.log('User profile not found in public.users table, creating it...');
+        
+        // Create a basic profile with default values
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: userId,
+              email: email,
+              name: email.split('@')[0], // Use part of email as name
+              role: 'customer' // Default role
+            }
+          ]);
+
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+          setError(`Error creating user profile: ${insertError.message}`);
+          return;
+        }
+        
+        console.log('User profile created successfully');
       }
 
-      console.log('User found, updating password for user ID:', userData.id);
-
-      // Update the user's password directly
+      // Update the user's password
       const { error: updateError } = await supabase.auth.admin.updateUserById(
-        userData.id,
+        userId,
         { password: newPassword }
       );
 
@@ -85,7 +126,6 @@ export default function ManualPasswordReset() {
       setSuccess(`Password for ${email} has been updated successfully!`);
       
       // Clear form
-      setEmail('');
       setNewPassword('');
       setConfirmPassword('');
 
