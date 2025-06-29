@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import {
   Home, ClipboardList, Users, BarChart3, Bot,
   ShoppingCart, Eye, FileText, ChefHat, Package,
-  Menu, ShoppingBag, Mic, Zap, Wine
+  Menu, ShoppingBag, Mic, Zap, Wine, BookOpen
 } from 'lucide-react';
 
 const navigationItems = {
@@ -32,7 +32,7 @@ const navigationItems = {
   bar: [
     { path: '/dashboard', icon: Home, labelKey: 'nav.home' },
     { path: '/pending-orders', icon: Wine, labelKey: 'nav.drinks' },
-    { path: '/inventory', icon: Package, labelKey: 'nav.stock' },
+    { path: '/bar-menu', icon: BookOpen, labelKey: 'nav.menu' },
     { path: '/ai', icon: Bot, labelKey: 'nav.ai' },
   ],
   customer: [
