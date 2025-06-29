@@ -49,8 +49,35 @@ export default function KitchenDashboard() {
       if (error) {
         console.error('Error loading orders:', error);
       } else {
-        setOrders(data || []);
-        setStats(prev => ({ ...prev, pendingOrders: data?.length || 0 }));
+        // Define drink categories in lowercase for case-insensitive comparison
+        const drinkCategories = ['drink', 'beverage', 'alcohol', 'coffee', 'tea', 'wine', 'beer', 'cocktail'];
+        
+        // Filter out drink items from each order
+        const ordersWithFilteredItems = data?.map(order => {
+          // Filter out drink items
+          const filteredItems = order.order_items?.filter(item => {
+            // Check if this item is NOT a drink
+            const isDrink = item.menu_item && drinkCategories.some(category => 
+              (item.menu_item.category || '').toLowerCase().includes(category.toLowerCase())
+            );
+            
+            // Keep items that are NOT drinks
+            return !isDrink;
+          }) || [];
+          
+          return {
+            ...order,
+            order_items: filteredItems
+          };
+        }) || [];
+        
+        // Only keep orders that still have items after filtering
+        const ordersWithItems = ordersWithFilteredItems.filter(order => 
+          order.order_items && order.order_items.length > 0
+        );
+        
+        setOrders(ordersWithItems);
+        setStats(prev => ({ ...prev, pendingOrders: ordersWithItems.length || 0 }));
       }
     } catch (error) {
       console.error('Error loading orders:', error);
