@@ -115,14 +115,12 @@ const translations = {
     'nav.staffOverview': 'Staff Overview',
     'nav.salesReports': 'Sales Reports',
     'nav.pendingOrders': 'Pending Orders',
-    'nav.completedDishes': 'Completed Dishes',
     'nav.inventoryView': 'Inventory View',
     'nav.cartCheckout': 'Cart/Checkout',
     'nav.aiAgent': 'AI Agent',
     'nav.myOrders': 'My Orders',
     'nav.browseMenu': 'Browse Menu',
     'nav.drinkOrders': 'Drink Orders',
-    'nav.completedDrinks': 'Completed Drinks',
     'nav.barInventory': 'Bar Inventory',
     
     // Navigation - Mobile (shorter labels)
@@ -610,14 +608,12 @@ const translations = {
     'nav.staffOverview': 'Personalübersicht',
     'nav.salesReports': 'Verkaufsberichte',
     'nav.pendingOrders': 'Ausstehende Bestellungen',
-    'nav.completedDishes': 'Fertige Gerichte',
     'nav.inventoryView': 'Lagerbestand',
     'nav.cartCheckout': 'Warenkorb/Kasse',
     'nav.aiAgent': 'KI-Agent',
     'nav.myOrders': 'Meine Bestellungen',
     'nav.browseMenu': 'Speisekarte durchsuchen',
     'nav.drinkOrders': 'Getränkebestellungen',
-    'nav.completedDrinks': 'Fertige Getränke',
     'nav.barInventory': 'Bar-Lagerbestand',
     
     // Navigation - Mobile (shorter labels)
