@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import LanguageSelector from './LanguageSelector';
@@ -15,9 +15,13 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState('');
   const [isValidSession, setIsValidSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState('');
   
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { resetPassword } = useAuth();
 
   useEffect(() => {
@@ -27,6 +31,18 @@ export default function ResetPassword() {
   const checkResetSession = async () => {
     try {
       console.log('Checking reset session...');
+      
+      // Check for error parameters in the URL hash
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const errorCode = hashParams.get('error_code');
+      const errorDescription = hashParams.get('error_description');
+      
+      if (errorCode === 'otp_expired' || errorCode === 'access_denied') {
+        console.error('Reset link expired or invalid:', errorDescription);
+        setError(errorDescription || 'Your password reset link has expired or is invalid. Please request a new one.');
+        setCheckingSession(false);
+        return;
+      }
       
       // Check if we have the required URL parameters for password reset
       const accessToken = searchParams.get('access_token');
@@ -48,16 +64,24 @@ export default function ResetPassword() {
         } else if (data.session) {
           console.log('Valid reset session established');
           setIsValidSession(true);
+          
+          // Get user email for potential resend
+          if (data.user) {
+            setResetEmail(data.user.email || '');
+          }
         } else {
           setError('Invalid reset session. Please request a new password reset.');
         }
       } else {
         // Check if user has an active session (maybe they're already logged in)
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session, user } } = await supabase.auth.getSession();
         
         if (session) {
           console.log('User has active session');
           setIsValidSession(true);
+          if (user) {
+            setResetEmail(user.email || '');
+          }
         } else {
           setError('No valid reset session found. Please request a new password reset.');
         }
@@ -118,6 +142,37 @@ export default function ResetPassword() {
     }
   };
 
+  const handleResendResetLink = async () => {
+    if (!resetEmail) {
+      setError('No email address available for resending the reset link');
+      return;
+    }
+
+    setResendLoading(true);
+    setResendSuccess('');
+    setError('');
+
+    try {
+      console.log('Resending password reset email to:', resetEmail);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error('Error resending reset email:', error);
+        setError(error.message || 'Failed to resend reset email. Please try again.');
+      } else {
+        setResendSuccess('New password reset link sent! Check your email inbox.');
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleBackToLogin = () => {
     navigate('/');
   };
@@ -166,15 +221,41 @@ export default function ResetPassword() {
                 </div>
               )}
               
+              {resendSuccess && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-green-700">{resendSuccess}</p>
+                  </div>
+                </div>
+              )}
+              
               <div className="text-center space-y-4">
                 <p className="text-gray-600">
                   The password reset link you used is either invalid or has expired. 
                   Please request a new password reset from the login page.
                 </p>
                 
+                {resetEmail && (
+                  <button
+                    onClick={handleResendResetLink}
+                    disabled={resendLoading}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {resendLoading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-5 h-5" />
+                        Resend Reset Link to {resetEmail}
+                      </>
+                    )}
+                  </button>
+                )}
+                
                 <button
                   onClick={handleBackToLogin}
-                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5" />
                   Back to Login

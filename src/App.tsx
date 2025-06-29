@@ -16,7 +16,6 @@ import QuickOrderModal from './components/QuickOrderModal';
 
 function AppContent() {
   const { user, loading } = useAuth();
-  const [showQuickOrder, setShowQuickOrder] = React.useState(false);
 
   // Show loading only during initial auth check
   if (loading) {
