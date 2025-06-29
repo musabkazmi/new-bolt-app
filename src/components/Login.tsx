@@ -36,8 +36,12 @@ export default function Login() {
           
           // Handle specific error cases
           if (error.message?.includes('User already registered') || 
-              error.message?.includes('user_already_exists')) {
-            setError('An account with this email already exists. Please sign in instead or use a different email address.');
+              error.message?.includes('user_already_exists') ||
+              error.code === 'user_already_exists') {
+            // Automatically switch to sign-in mode
+            setIsSignUp(false);
+            setSuccess('An account with this email already exists. Please sign in with your password below.');
+            setError('');
           } else if (error.message?.includes('Password should be at least')) {
             setError('Password must be at least 6 characters long.');
           } else if (error.message?.includes('Invalid email')) {
@@ -83,9 +87,6 @@ export default function Login() {
     customer: 'from-purple-500 to-purple-600',
     bar: 'from-pink-500 to-pink-600'
   };
-
-  // Check if the error is about user already existing
-  const isUserExistsError = error.includes('account with this email already exists');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
@@ -201,39 +202,16 @@ export default function Login() {
             </div>
 
             {error && (
-              <div className={`p-3 rounded-lg text-sm border flex items-start gap-2 ${
-                isUserExistsError 
-                  ? 'bg-blue-50 border-blue-200 text-blue-700' 
-                  : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
-                {isUserExistsError ? (
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                )}
-                <div>
-                  {error}
-                  {isUserExistsError && (
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSignUp(false);
-                          setError('');
-                        }}
-                        className="text-blue-600 hover:text-blue-800 font-medium underline"
-                      >
-                        Switch to Sign In
-                      </button>
-                    </div>
-                  )}
-                </div>
+              <div className="p-3 rounded-lg text-sm border bg-red-50 border-red-200 text-red-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>{error}</div>
               </div>
             )}
 
             {success && (
-              <div className="p-3 rounded-lg text-sm bg-green-50 border border-green-200 text-green-700">
-                {success}
+              <div className="p-3 rounded-lg text-sm bg-green-50 border border-green-200 text-green-700 flex items-start gap-2">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>{success}</div>
               </div>
             )}
 
