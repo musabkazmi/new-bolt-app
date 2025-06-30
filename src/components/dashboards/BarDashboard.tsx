@@ -145,11 +145,18 @@ export default function BarDashboard() {
         console.log(`Order #${order.id.slice(0, 8)} has ${order.order_items.length} drink items`);
       });
       
-      // Only show pending/preparing orders
-      const pendingOrders = ordersWithDrinks.filter(order => 
-        order.status === 'pending' || order.status === 'preparing' || 
-        order.order_items.some(item => item.status === 'pending' || item.status === 'preparing')
-      );
+      // Only show pending/preparing orders and filter out items that are ready
+      const pendingOrders = ordersWithDrinks.map(order => {
+        // Filter out ready items
+        const pendingItems = order.order_items.filter(item => 
+          item.status === 'pending' || item.status === 'preparing'
+        );
+        
+        return {
+          ...order,
+          order_items: pendingItems
+        };
+      }).filter(order => order.order_items.length > 0);
       
       setDrinkOrders(pendingOrders);
 
@@ -501,11 +508,6 @@ export default function BarDashboard() {
                               >
                                 Ready
                               </button>
-                            )}
-                            {item.status === 'ready' && (
-                              <span className="px-3 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                                ✓ Ready for pickup
-                              </span>
                             )}
                           </div>
                         </div>

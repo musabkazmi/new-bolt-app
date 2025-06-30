@@ -136,7 +136,17 @@ export default function DrinkOrdersPage() {
         console.log(`Order #${order.id.slice(0, 8)} has ${order.order_items.length} drink items`);
       });
       
-      setDrinkOrders(ordersWithDrinks);
+      // Filter out ready items from each order
+      const filteredOrders = ordersWithDrinks.map(order => {
+        return {
+          ...order,
+          order_items: order.order_items.filter(item => 
+            item.status === 'pending' || item.status === 'preparing'
+          )
+        };
+      }).filter(order => order.order_items.length > 0);
+      
+      setDrinkOrders(filteredOrders);
 
     } catch (error) {
       console.error('Error loading drink orders:', error);
@@ -357,11 +367,6 @@ export default function DrinkOrdersPage() {
                               >
                                 {t('bar.ready')}
                               </button>
-                            )}
-                            {item.status === 'ready' && (
-                              <span className="px-3 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                                ✓ {t('bar.readyForPickup')}
-                              </span>
                             )}
                           </div>
                         </div>
