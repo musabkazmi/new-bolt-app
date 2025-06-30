@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wine, Search, Filter, RefreshCw, AlertCircle, Tag, DollarSign, Info } from 'lucide-react';
-import { supabase, MenuItem } from '../lib/supabase';
+import { supabase, MenuItem, InventoryItem } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -11,12 +11,14 @@ export default function BarMenuPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<string[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const { user } = useAuth();
   const { t } = useLanguage();
 
   useEffect(() => {
     if (user) {
       loadBeverages();
+      loadInventory();
     } else {
       setLoading(false);
     }
@@ -25,6 +27,23 @@ export default function BarMenuPage() {
   useEffect(() => {
     filterBeverages();
   }, [beverages, searchTerm, selectedCategory]);
+
+  const loadInventory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('*');
+        
+      if (error) {
+        console.error('Error loading inventory:', error);
+        return;
+      }
+      
+      setInventoryItems(data || []);
+    } catch (err) {
+      console.error('Error loading inventory:', err);
+    }
+  };
 
   const loadBeverages = async () => {
     try {
@@ -54,7 +73,9 @@ export default function BarMenuPage() {
         return;
       }
 
-      setBeverages(data);
+      // Check inventory availability for each beverage
+      const beveragesWithAvailability = await checkBeverageAvailability(data);
+      setBeverages(beveragesWithAvailability);
       
       // Extract unique categories
       const uniqueCategories = [...new Set(data.map(item => item.category))];
@@ -67,6 +88,45 @@ export default function BarMenuPage() {
       setError('An unexpected error occurred while loading the beverages');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkBeverageAvailability = async (beverages: MenuItem[]): Promise<MenuItem[]> => {
+    try {
+      // Get all inventory items
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from('inventory_items')
+        .select('*');
+        
+      if (inventoryError) {
+        console.error('Error loading inventory for availability check:', inventoryError);
+        return beverages;
+      }
+      
+      const inventory = inventoryData || [];
+      
+      // Check each beverage's required inventory
+      return beverages.map(beverage => {
+        // If no required inventory, keep current availability
+        if (!beverage.required_inventory || beverage.required_inventory.length === 0) {
+          return beverage;
+        }
+        
+        // Check if all required inventory items are available (quantity > 0)
+        const allIngredientsAvailable = beverage.required_inventory.every(ingredientName => {
+          const inventoryItem = inventory.find(item => item.name === ingredientName);
+          return inventoryItem && inventoryItem.quantity > 0;
+        });
+        
+        // Update availability based on inventory
+        return {
+          ...beverage,
+          available: allIngredientsAvailable
+        };
+      });
+    } catch (err) {
+      console.error('Error checking beverage availability:', err);
+      return beverages;
     }
   };
 
@@ -89,6 +149,22 @@ export default function BarMenuPage() {
     }
 
     setFilteredBeverages(filtered);
+  };
+
+  const getRequiredInventoryStatus = (beverage: MenuItem) => {
+    if (!beverage.required_inventory || beverage.required_inventory.length === 0) {
+      return { complete: true, missing: [] };
+    }
+    
+    const missing = beverage.required_inventory.filter(ingredientName => {
+      const inventoryItem = inventoryItems.find(item => item.name === ingredientName);
+      return !inventoryItem || inventoryItem.quantity <= 0;
+    });
+    
+    return {
+      complete: missing.length === 0,
+      missing
+    };
   };
 
   // Don't show loading if user is not logged in
@@ -140,7 +216,10 @@ export default function BarMenuPage() {
             {filteredBeverages.length} of {beverages.length} beverages
           </div>
           <button
-            onClick={loadBeverages}
+            onClick={() => {
+              loadBeverages();
+              loadInventory();
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
@@ -184,73 +263,107 @@ export default function BarMenuPage() {
       {/* Beverages Grid */}
       {filteredBeverages.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBeverages.map((beverage) => (
-            <div key={beverage.id} className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="bg-gradient-to-br from-purple-100 to-purple-200 h-32 flex items-center justify-center">
-                {beverage.image_url ? (
-                  <img 
-                    src={beverage.image_url} 
-                    alt={beverage.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Wine className="w-12 h-12 text-purple-400" />
-                )}
-              </div>
-              
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900">{beverage.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      beverage.available 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {beverage.available ? 'Available' : 'Unavailable'}
-                    </span>
-                  </div>
+          {filteredBeverages.map((beverage) => {
+            const inventoryStatus = getRequiredInventoryStatus(beverage);
+            
+            return (
+              <div key={beverage.id} className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="bg-gradient-to-br from-purple-100 to-purple-200 h-32 flex items-center justify-center">
+                  {beverage.image_url ? (
+                    <img 
+                      src={beverage.image_url} 
+                      alt={beverage.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Wine className="w-12 h-12 text-purple-400" />
+                  )}
                 </div>
                 
-                <p className="text-gray-600 text-sm mb-3">{beverage.description}</p>
-                
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                    <Tag className="w-3 h-3" />
-                    {beverage.category}
-                  </span>
-                  <span className="flex items-center gap-1 text-xl font-bold text-gray-900">
-                    <DollarSign className="w-4 h-4 text-purple-600" />
-                    {typeof beverage.price === 'number' ? beverage.price.toFixed(2).replace('.', ',') : beverage.price}
-                  </span>
-                </div>
-
-                {/* Additional Details */}
-                {(beverage.preparation_time || beverage.calories || (beverage.ingredients && beverage.ingredients.length > 0)) && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {beverage.preparation_time && (
-                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
-                          Prep: {beverage.preparation_time} min
-                        </span>
-                      )}
-                      {beverage.calories && (
-                        <span className="px-2 py-1 bg-orange-50 text-orange-700 rounded-full">
-                          {beverage.calories} cal
-                        </span>
-                      )}
-                      {beverage.ingredients && beverage.ingredients.length > 0 && (
-                        <span className="px-2 py-1 bg-green-50 text-green-700 rounded-full flex items-center gap-1">
-                          <Info className="w-3 h-3" />
-                          {beverage.ingredients.length} ingredients
-                        </span>
-                      )}
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900">{beverage.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        beverage.available 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {beverage.available ? 'Available' : 'Unavailable'}
+                      </span>
                     </div>
                   </div>
-                )}
+                  
+                  <p className="text-gray-600 text-sm mb-3">{beverage.description}</p>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      <Tag className="w-3 h-3" />
+                      {beverage.category}
+                    </span>
+                    <span className="flex items-center gap-1 text-xl font-bold text-gray-900">
+                      <DollarSign className="w-4 h-4 text-purple-600" />
+                      {typeof beverage.price === 'number' ? beverage.price.toFixed(2).replace('.', ',') : beverage.price}
+                    </span>
+                  </div>
+
+                  {/* Required Inventory Status */}
+                  {beverage.required_inventory && beverage.required_inventory.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                        <Info className="w-3 h-3" />
+                        <span>Required ingredients:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {beverage.required_inventory.map((ingredient, idx) => {
+                          const inventoryItem = inventoryItems.find(item => item.name === ingredient);
+                          const isAvailable = inventoryItem && inventoryItem.quantity > 0;
+                          
+                          return (
+                            <span 
+                              key={idx} 
+                              className={`text-xs px-2 py-1 rounded-full ${
+                                isAvailable 
+                                  ? 'bg-green-50 text-green-700' 
+                                  : 'bg-red-50 text-red-700'
+                              }`}
+                              title={isAvailable ? 'In stock' : 'Out of stock'}
+                            >
+                              {ingredient}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Additional Details */}
+                  {(beverage.preparation_time || beverage.calories || (beverage.ingredients && beverage.ingredients.length > 0)) && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {beverage.preparation_time && (
+                          <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
+                            Prep: {beverage.preparation_time} min
+                          </span>
+                        )}
+                        {beverage.calories && (
+                          <span className="px-2 py-1 bg-orange-50 text-orange-700 rounded-full">
+                            {beverage.calories} cal
+                          </span>
+                        )}
+                        {beverage.ingredients && beverage.ingredients.length > 0 && (
+                          <span className="px-2 py-1 bg-green-50 text-green-700 rounded-full flex items-center gap-1">
+                            <Info className="w-3 h-3" />
+                            {beverage.ingredients.length} ingredients
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-12">

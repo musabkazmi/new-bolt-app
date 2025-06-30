@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wine, Clock, CheckCircle2, AlertCircle, Bell, Volume2, VolumeX, RefreshCw } from 'lucide-react';
-import { supabase, Order, OrderItem } from '../lib/supabase';
+import { supabase, Order, OrderItem, MenuItem, InventoryItem } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -9,12 +9,14 @@ export default function DrinkOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const { user } = useAuth();
   const { t } = useLanguage();
 
   useEffect(() => {
     // Only load data if user exists and is bar staff
     if (user && user.role === 'bar') {
+      loadInventory();
       loadDrinkOrders();
       
       // Set up real-time subscription for new drink orders
@@ -36,14 +38,50 @@ export default function DrinkOrdersPage() {
         )
         .subscribe();
 
+      // Set up subscription for inventory changes
+      const inventorySubscription = supabase
+        .channel('inventory-changes')
+        .on('postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'inventory_items'
+          },
+          (payload) => {
+            console.log('Inventory change detected:', payload);
+            loadInventory();
+            // Reload drink orders to update availability
+            loadDrinkOrders();
+          }
+        )
+        .subscribe();
+
       return () => {
         subscription.unsubscribe();
+        inventorySubscription.unsubscribe();
       };
     } else if (user) {
       // If user exists but not bar staff, stop loading
       setLoading(false);
     }
   }, [user, soundEnabled]);
+
+  const loadInventory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('*');
+        
+      if (error) {
+        console.error('Error loading inventory:', error);
+        return;
+      }
+      
+      setInventoryItems(data || []);
+    } catch (err) {
+      console.error('Error loading inventory:', err);
+    }
+  };
 
   const playNotificationSound = () => {
     // Create a simple notification sound using Web Audio API
@@ -146,7 +184,32 @@ export default function DrinkOrdersPage() {
         };
       }).filter(order => order.order_items.length > 0);
       
-      setDrinkOrders(filteredOrders);
+      // Check inventory availability for each drink
+      const ordersWithAvailability = filteredOrders.map(order => {
+        const itemsWithAvailability = order.order_items.map(item => {
+          // Check if all required inventory is available
+          let canPrepare = true;
+          
+          if (item.menu_item && item.menu_item.required_inventory && item.menu_item.required_inventory.length > 0) {
+            canPrepare = item.menu_item.required_inventory.every(ingredientName => {
+              const inventoryItem = inventoryItems.find(invItem => invItem.name === ingredientName);
+              return inventoryItem && inventoryItem.quantity > 0;
+            });
+          }
+          
+          return {
+            ...item,
+            canPrepare
+          };
+        });
+        
+        return {
+          ...order,
+          order_items: itemsWithAvailability
+        };
+      });
+      
+      setDrinkOrders(ordersWithAvailability);
 
     } catch (error) {
       console.error('Error loading drink orders:', error);
@@ -156,10 +219,58 @@ export default function DrinkOrdersPage() {
     }
   };
 
-  const updateDrinkStatus = async (itemId: string, status: string) => {
+  const updateDrinkStatus = async (itemId: string, status: string, menuItem: MenuItem) => {
     try {
       console.log('Updating drink status:', itemId, 'to', status);
 
+      // Check if we need to update inventory (only when preparing or ready)
+      if ((status === 'preparing' || status === 'ready') && menuItem.required_inventory && menuItem.required_inventory.length > 0) {
+        // For 'preparing', we'll reserve the ingredients
+        // For 'ready', we'll consume the ingredients
+        const consumeInventory = status === 'ready';
+        
+        // Update inventory for each required ingredient
+        for (const ingredientName of menuItem.required_inventory) {
+          // Find the inventory item
+          const { data: inventoryItems, error: findError } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('name', ingredientName)
+            .limit(1);
+            
+          if (findError) {
+            console.error(`Error finding inventory item ${ingredientName}:`, findError);
+            continue;
+          }
+          
+          if (!inventoryItems || inventoryItems.length === 0) {
+            console.warn(`Inventory item ${ingredientName} not found`);
+            continue;
+          }
+          
+          const inventoryItem = inventoryItems[0];
+          
+          // Only consume if we're marking as ready and have enough quantity
+          if (consumeInventory && inventoryItem.quantity > 0) {
+            // Reduce inventory by 1 unit
+            const { error: updateError } = await supabase
+              .from('inventory_items')
+              .update({ 
+                quantity: Math.max(0, inventoryItem.quantity - 1),
+                last_updated: new Date().toISOString()
+              })
+              .eq('id', inventoryItem.id);
+              
+            if (updateError) {
+              console.error(`Error updating inventory for ${ingredientName}:`, updateError);
+            } else {
+              console.log(`Consumed 1 unit of ${ingredientName} from inventory`);
+            }
+          }
+        }
+      }
+
+      // Update the order item status
       const { error } = await supabase
         .from('order_items')
         .update({ status })
@@ -270,7 +381,10 @@ export default function DrinkOrdersPage() {
             {soundEnabled ? t('bar.soundOn') : t('bar.soundOff')}
           </button>
           <button
-            onClick={loadDrinkOrders}
+            onClick={() => {
+              loadDrinkOrders();
+              loadInventory();
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
@@ -330,48 +444,79 @@ export default function DrinkOrdersPage() {
                   </div>
                   
                   <div className="space-y-3">
-                    {order.order_items?.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-purple-200">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Wine className="w-4 h-4 text-purple-600" />
-                            <span className="font-medium">
-                              {item.quantity}x {item.menu_item?.name || t('bar.unknownDrink')}
-                            </span>
+                    {order.order_items?.map((item) => {
+                      const canPrepare = 'canPrepare' in item ? item.canPrepare : true;
+                      
+                      return (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-purple-200">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Wine className="w-4 h-4 text-purple-600" />
+                              <span className="font-medium">
+                                {item.quantity}x {item.menu_item?.name || t('bar.unknownDrink')}
+                              </span>
+                              {!canPrepare && (
+                                <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                                  Missing ingredients
+                                </span>
+                              )}
+                            </div>
+                            {item.notes && (
+                              <p className="text-sm text-gray-600 italic">{t('common.notes')}: {item.notes}</p>
+                            )}
+                            <p className="text-sm text-gray-500">€{item.price.toFixed(2)} {t('orders.each')}</p>
+                            
+                            {/* Show missing ingredients */}
+                            {!canPrepare && item.menu_item?.required_inventory && (
+                              <div className="mt-1 text-xs text-red-600">
+                                Missing: {item.menu_item.required_inventory.filter(ingredientName => {
+                                  const inventoryItem = inventoryItems.find(invItem => invItem.name === ingredientName);
+                                  return !inventoryItem || inventoryItem.quantity <= 0;
+                                }).join(', ')}
+                              </div>
+                            )}
                           </div>
-                          {item.notes && (
-                            <p className="text-sm text-gray-600 italic">{t('common.notes')}: {item.notes}</p>
-                          )}
-                          <p className="text-sm text-gray-500">€{item.price.toFixed(2)} {t('orders.each')}</p>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getDrinkStatusColor(item.status)}`}>
-                            {getDrinkStatusIcon(item.status)}
-                            {t(`orders.${item.status}`).toUpperCase()}
-                          </span>
                           
-                          <div className="flex gap-2">
-                            {item.status === 'pending' && (
-                              <button
-                                onClick={() => updateDrinkStatus(item.id, 'preparing')}
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-                              >
-                                {t('bar.start')}
-                              </button>
-                            )}
-                            {item.status === 'preparing' && (
-                              <button
-                                onClick={() => updateDrinkStatus(item.id, 'ready')}
-                                className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
-                              >
-                                {t('bar.ready')}
-                              </button>
-                            )}
+                          <div className="flex items-center gap-3">
+                            <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getDrinkStatusColor(item.status)}`}>
+                              {getDrinkStatusIcon(item.status)}
+                              {t(`orders.${item.status}`).toUpperCase()}
+                            </span>
+                            
+                            <div className="flex gap-2">
+                              {item.status === 'pending' && (
+                                <button
+                                  onClick={() => updateDrinkStatus(item.id, 'preparing', item.menu_item)}
+                                  disabled={!canPrepare}
+                                  className={`px-3 py-1 rounded text-xs text-white ${
+                                    canPrepare 
+                                      ? 'bg-blue-600 hover:bg-blue-700' 
+                                      : 'bg-gray-400 cursor-not-allowed'
+                                  } transition-colors`}
+                                  title={canPrepare ? t('bar.start') : 'Missing ingredients'}
+                                >
+                                  {t('bar.start')}
+                                </button>
+                              )}
+                              {item.status === 'preparing' && (
+                                <button
+                                  onClick={() => updateDrinkStatus(item.id, 'ready', item.menu_item)}
+                                  disabled={!canPrepare}
+                                  className={`px-3 py-1 rounded text-xs text-white ${
+                                    canPrepare 
+                                      ? 'bg-green-600 hover:bg-green-700' 
+                                      : 'bg-gray-400 cursor-not-allowed'
+                                  } transition-colors`}
+                                  title={canPrepare ? t('bar.ready') : 'Missing ingredients'}
+                                >
+                                  {t('bar.ready')}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}

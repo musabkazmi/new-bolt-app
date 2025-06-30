@@ -4,21 +4,9 @@ import {
   RefreshCw, Filter, Save, X, Edit, Trash2, AlertCircle, 
   Download, Upload, BarChart, Droplet, Wine, Coffee
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, InventoryItem } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  category: string;
-  quantity: number;
-  unit: string;
-  threshold: number;
-  lastUpdated: string;
-  status: 'sufficient' | 'low' | 'critical';
-  notes?: string;
-}
 
 export default function BarInventoryPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -43,175 +31,6 @@ export default function BarInventoryPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  // Mock inventory data - in a real app, this would come from the database
-  const mockInventoryData: InventoryItem[] = [
-    {
-      id: '1',
-      name: 'Vodka',
-      category: 'Alcohol',
-      quantity: 12,
-      unit: 'bottles',
-      threshold: 5,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'Standard 750ml bottles'
-    },
-    {
-      id: '2',
-      name: 'Rum',
-      category: 'Alcohol',
-      quantity: 8,
-      unit: 'bottles',
-      threshold: 5,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'White and dark rum'
-    },
-    {
-      id: '3',
-      name: 'Gin',
-      category: 'Alcohol',
-      quantity: 4,
-      unit: 'bottles',
-      threshold: 5,
-      lastUpdated: new Date().toISOString(),
-      status: 'low',
-      notes: 'Premium London dry gin'
-    },
-    {
-      id: '4',
-      name: 'Tequila',
-      category: 'Alcohol',
-      quantity: 2,
-      unit: 'bottles',
-      threshold: 5,
-      lastUpdated: new Date().toISOString(),
-      status: 'critical',
-      notes: 'Silver tequila'
-    },
-    {
-      id: '5',
-      name: 'Coffee Beans',
-      category: 'Coffee',
-      quantity: 8,
-      unit: 'kg',
-      threshold: 3,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'Arabica beans'
-    },
-    {
-      id: '6',
-      name: 'Milk',
-      category: 'Dairy',
-      quantity: 15,
-      unit: 'liters',
-      threshold: 10,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'Whole milk'
-    },
-    {
-      id: '7',
-      name: 'Lemons',
-      category: 'Fruit',
-      quantity: 25,
-      unit: 'pieces',
-      threshold: 15,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'For garnish and cocktails'
-    },
-    {
-      id: '8',
-      name: 'Limes',
-      category: 'Fruit',
-      quantity: 12,
-      unit: 'pieces',
-      threshold: 15,
-      lastUpdated: new Date().toISOString(),
-      status: 'low',
-      notes: 'For garnish and cocktails'
-    },
-    {
-      id: '9',
-      name: 'Simple Syrup',
-      category: 'Syrups',
-      quantity: 3,
-      unit: 'bottles',
-      threshold: 2,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: '500ml bottles'
-    },
-    {
-      id: '10',
-      name: 'Mint',
-      category: 'Herbs',
-      quantity: 5,
-      unit: 'bunches',
-      threshold: 3,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'For mojitos and garnish'
-    },
-    {
-      id: '11',
-      name: 'Tonic Water',
-      category: 'Mixers',
-      quantity: 24,
-      unit: 'bottles',
-      threshold: 12,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: '200ml bottles'
-    },
-    {
-      id: '12',
-      name: 'Soda Water',
-      category: 'Mixers',
-      quantity: 18,
-      unit: 'bottles',
-      threshold: 12,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: '200ml bottles'
-    },
-    {
-      id: '13',
-      name: 'Orange Juice',
-      category: 'Juices',
-      quantity: 8,
-      unit: 'liters',
-      threshold: 5,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'Fresh squeezed'
-    },
-    {
-      id: '14',
-      name: 'Cranberry Juice',
-      category: 'Juices',
-      quantity: 3,
-      unit: 'liters',
-      threshold: 5,
-      lastUpdated: new Date().toISOString(),
-      status: 'low',
-      notes: ''
-    },
-    {
-      id: '15',
-      name: 'Ice',
-      category: 'Essentials',
-      quantity: 25,
-      unit: 'kg',
-      threshold: 10,
-      lastUpdated: new Date().toISOString(),
-      status: 'sufficient',
-      notes: 'Cubed ice'
-    }
-  ];
-
   useEffect(() => {
     if (user && user.role === 'bar') {
       loadInventory();
@@ -229,15 +48,22 @@ export default function BarInventoryPage() {
       setLoading(true);
       setError('');
       
-      // In a real app, this would fetch from Supabase
-      // For now, we'll use mock data
       console.log('Loading bar inventory...');
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .order('category', { ascending: true })
+        .order('name', { ascending: true });
+      
+      if (error) {
+        console.error('Error loading inventory:', error);
+        setError('Failed to load inventory items: ' + error.message);
+        return;
+      }
       
       // Update status based on quantity vs threshold
-      const itemsWithStatus = mockInventoryData.map(item => ({
+      const itemsWithStatus = (data || []).map(item => ({
         ...item,
         status: getItemStatus(item.quantity, item.threshold)
       }));
@@ -260,6 +86,7 @@ export default function BarInventoryPage() {
   };
 
   const getItemStatus = (quantity: number, threshold: number): 'sufficient' | 'low' | 'critical' => {
+    if (quantity <= 0) return 'critical';
     if (quantity <= threshold * 0.3) return 'critical';
     if (quantity <= threshold) return 'low';
     return 'sufficient';
@@ -285,19 +112,45 @@ export default function BarInventoryPage() {
     setFilteredItems(filtered);
   };
 
-  const updateQuantity = (id: string, change: number) => {
-    setInventoryItems(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQuantity = Math.max(0, item.quantity + change);
-        return {
-          ...item,
+  const updateQuantity = async (id: string, change: number) => {
+    try {
+      const item = inventoryItems.find(item => item.id === id);
+      if (!item) return;
+      
+      const newQuantity = Math.max(0, item.quantity + change);
+      
+      // Update in database
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ 
           quantity: newQuantity,
-          status: getItemStatus(newQuantity, item.threshold),
-          lastUpdated: new Date().toISOString()
-        };
+          last_updated: new Date().toISOString()
+        })
+        .eq('id', id);
+        
+      if (error) {
+        console.error('Error updating inventory quantity:', error);
+        setError('Failed to update quantity: ' + error.message);
+        return;
       }
-      return item;
-    }));
+      
+      // Update local state
+      setInventoryItems(prev => prev.map(item => {
+        if (item.id === id) {
+          return {
+            ...item,
+            quantity: newQuantity,
+            status: getItemStatus(newQuantity, item.threshold),
+            last_updated: new Date().toISOString()
+          };
+        }
+        return item;
+      }));
+      
+    } catch (err) {
+      console.error('Error updating quantity:', err);
+      setError('Failed to update quantity');
+    }
   };
 
   const handleAddItem = () => {
@@ -325,9 +178,26 @@ export default function BarInventoryPage() {
     setShowEditModal(true);
   };
 
-  const handleDeleteItem = (id: string) => {
-    if (confirm('Are you sure you want to delete this item?')) {
-      setInventoryItems(prev => prev.filter(item => item.id !== id));
+  const handleDeleteItem = async (id: string) => {
+    if (confirm('Are you sure you want to delete this item? This may affect menu item availability.')) {
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .eq('id', id);
+          
+        if (error) {
+          console.error('Error deleting inventory item:', error);
+          setError('Failed to delete item: ' + error.message);
+          return;
+        }
+        
+        setInventoryItems(prev => prev.filter(item => item.id !== id));
+        
+      } catch (err) {
+        console.error('Error deleting item:', err);
+        setError('Failed to delete item');
+      }
     }
   };
 
@@ -337,7 +207,7 @@ export default function BarInventoryPage() {
     if (name === 'quantity' || name === 'threshold') {
       setFormData(prev => ({
         ...prev,
-        [name]: parseInt(value) || 0
+        [name]: parseFloat(value) || 0
       }));
     } else {
       setFormData(prev => ({
@@ -347,7 +217,7 @@ export default function BarInventoryPage() {
     }
   };
 
-  const handleSaveNewItem = () => {
+  const handleSaveNewItem = async () => {
     if (!formData.name.trim()) {
       alert('Please enter a name for the item');
       return;
@@ -355,27 +225,48 @@ export default function BarInventoryPage() {
 
     setIsSaving(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const newItem: InventoryItem = {
-        id: Date.now().toString(),
+    try {
+      const newItem = {
         name: formData.name.trim(),
         category: formData.category,
         quantity: formData.quantity,
         unit: formData.unit,
         threshold: formData.threshold,
-        lastUpdated: new Date().toISOString(),
-        status: getItemStatus(formData.quantity, formData.threshold),
-        notes: formData.notes.trim() || undefined
+        notes: formData.notes.trim() || null,
+        last_updated: new Date().toISOString()
       };
 
-      setInventoryItems(prev => [...prev, newItem]);
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert([newItem])
+        .select();
+        
+      if (error) {
+        console.error('Error adding inventory item:', error);
+        setError('Failed to add item: ' + error.message);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        const addedItem = {
+          ...data[0],
+          status: getItemStatus(data[0].quantity, data[0].threshold)
+        };
+        
+        setInventoryItems(prev => [...prev, addedItem]);
+      }
+      
       setShowAddModal(false);
+      
+    } catch (err) {
+      console.error('Error adding item:', err);
+      setError('Failed to add item');
+    } finally {
       setIsSaving(false);
-    }, 500);
+    }
   };
 
-  const handleUpdateItem = () => {
+  const handleUpdateItem = async () => {
     if (!currentItem || !formData.name.trim()) {
       alert('Please enter a name for the item');
       return;
@@ -383,20 +274,34 @@ export default function BarInventoryPage() {
 
     setIsSaving(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const updatedItem = {
+        name: formData.name.trim(),
+        category: formData.category,
+        quantity: formData.quantity,
+        unit: formData.unit,
+        threshold: formData.threshold,
+        notes: formData.notes.trim() || null,
+        last_updated: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('inventory_items')
+        .update(updatedItem)
+        .eq('id', currentItem.id);
+        
+      if (error) {
+        console.error('Error updating inventory item:', error);
+        setError('Failed to update item: ' + error.message);
+        return;
+      }
+      
       setInventoryItems(prev => prev.map(item => {
         if (item.id === currentItem.id) {
           return {
             ...item,
-            name: formData.name.trim(),
-            category: formData.category,
-            quantity: formData.quantity,
-            unit: formData.unit,
-            threshold: formData.threshold,
-            lastUpdated: new Date().toISOString(),
-            status: getItemStatus(formData.quantity, formData.threshold),
-            notes: formData.notes.trim() || undefined
+            ...updatedItem,
+            status: getItemStatus(updatedItem.quantity, updatedItem.threshold)
           };
         }
         return item;
@@ -404,8 +309,13 @@ export default function BarInventoryPage() {
       
       setShowEditModal(false);
       setCurrentItem(null);
+      
+    } catch (err) {
+      console.error('Error updating item:', err);
+      setError('Failed to update item');
+    } finally {
       setIsSaving(false);
-    }, 500);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -458,7 +368,7 @@ export default function BarInventoryPage() {
         `"${item.unit}"`,
         item.threshold,
         `"${item.status}"`,
-        `"${new Date(item.lastUpdated).toLocaleString()}"`,
+        `"${new Date(item.last_updated).toLocaleString()}"`,
         `"${item.notes || ''}"`
       ].join(','))
     ].join('\n');
@@ -704,7 +614,7 @@ export default function BarInventoryPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(item.lastUpdated).toLocaleString()}
+                      {new Date(item.last_updated).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
@@ -830,6 +740,7 @@ export default function BarInventoryPage() {
                     value={formData.quantity}
                     onChange={handleInputChange}
                     min="0"
+                    step="0.01"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     required
                   />
@@ -868,6 +779,7 @@ export default function BarInventoryPage() {
                   value={formData.threshold}
                   onChange={handleInputChange}
                   min="1"
+                  step="0.01"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   required
                 />
@@ -998,6 +910,7 @@ export default function BarInventoryPage() {
                     value={formData.quantity}
                     onChange={handleInputChange}
                     min="0"
+                    step="0.01"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
@@ -1036,6 +949,7 @@ export default function BarInventoryPage() {
                   value={formData.threshold}
                   onChange={handleInputChange}
                   min="1"
+                  step="0.01"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />

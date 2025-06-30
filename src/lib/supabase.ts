@@ -52,6 +52,8 @@ export interface MenuItem {
   preparation_time?: number;
   calories?: number;
   dietary_info?: string[];
+  // New field for required inventory items
+  required_inventory?: string[];
 }
 
 export interface Order {
@@ -84,4 +86,15 @@ export interface Message {
   content: string;
   type: 'user' | 'assistant';
   created_at: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  threshold: number;
+  last_updated: string;
+  notes?: string;
 }
