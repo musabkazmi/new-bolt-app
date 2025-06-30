@@ -220,20 +220,26 @@ export default function BarDashboard() {
         completedToday: completedDrinks.length 
       }));
 
-      // Get low stock items count
+      // Get low stock items count - fetch quantity and threshold to calculate status client-side
       const { data: inventoryData, error: inventoryError } = await supabase
         .from('inventory_items')
-        .select('*')
-        .or('status.eq.low,status.eq.critical');
+        .select('id, name, quantity, threshold, is_critical');
         
       if (inventoryError) {
         console.error('Error loading inventory stats:', inventoryError);
         return;
       }
       
+      // Calculate low stock items client-side
+      const lowStockItems = (inventoryData || []).filter(item => {
+        const quantity = parseFloat(item.quantity) || 0;
+        const threshold = parseFloat(item.threshold) || 0;
+        return quantity <= threshold;
+      });
+      
       setStats(prev => ({
         ...prev,
-        lowStockItems: inventoryData?.length || 0
+        lowStockItems: lowStockItems.length
       }));
 
     } catch (error) {
