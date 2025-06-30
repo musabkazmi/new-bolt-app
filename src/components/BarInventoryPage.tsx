@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Package, Search, Plus, Minus, AlertTriangle, CheckCircle, 
   RefreshCw, Filter, Save, X, Edit, Trash2, AlertCircle, 
-  Download, Upload, BarChart, Droplet, Wine, Coffee
+  Download, Upload, BarChart, Droplet, Wine, Coffee, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { supabase, InventoryItem } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,7 +25,8 @@ export default function BarInventoryPage() {
     quantity: 0,
     unit: 'bottles',
     threshold: 5,
-    notes: ''
+    notes: '',
+    is_critical: true
   });
   const [isSaving, setIsSaving] = useState(false);
   const { user } = useAuth();
@@ -160,7 +161,8 @@ export default function BarInventoryPage() {
       quantity: 0,
       unit: 'bottles',
       threshold: 5,
-      notes: ''
+      notes: '',
+      is_critical: true
     });
     setShowAddModal(true);
   };
@@ -173,7 +175,8 @@ export default function BarInventoryPage() {
       quantity: item.quantity,
       unit: item.unit,
       threshold: item.threshold,
-      notes: item.notes || ''
+      notes: item.notes || '',
+      is_critical: item.is_critical !== false // Default to true if undefined
     });
     setShowEditModal(true);
   };
@@ -202,9 +205,14 @@ export default function BarInventoryPage() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     
-    if (name === 'quantity' || name === 'threshold') {
+    if (type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+    } else if (name === 'quantity' || name === 'threshold') {
       setFormData(prev => ({
         ...prev,
         [name]: parseFloat(value) || 0
@@ -233,7 +241,8 @@ export default function BarInventoryPage() {
         unit: formData.unit,
         threshold: formData.threshold,
         notes: formData.notes.trim() || null,
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
+        is_critical: formData.is_critical
       };
 
       const { data, error } = await supabase
@@ -282,7 +291,8 @@ export default function BarInventoryPage() {
         unit: formData.unit,
         threshold: formData.threshold,
         notes: formData.notes.trim() || null,
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
+        is_critical: formData.is_critical
       };
 
       const { error } = await supabase
@@ -358,7 +368,7 @@ export default function BarInventoryPage() {
   };
 
   const exportInventory = () => {
-    const headers = ['Name', 'Category', 'Quantity', 'Unit', 'Threshold', 'Status', 'Last Updated', 'Notes'];
+    const headers = ['Name', 'Category', 'Quantity', 'Unit', 'Threshold', 'Status', 'Critical', 'Last Updated', 'Notes'];
     const csvContent = [
       headers.join(','),
       ...inventoryItems.map(item => [
@@ -368,6 +378,7 @@ export default function BarInventoryPage() {
         `"${item.unit}"`,
         item.threshold,
         `"${item.status}"`,
+        item.is_critical === false ? 'No' : 'Yes',
         `"${new Date(item.last_updated).toLocaleString()}"`,
         `"${item.notes || ''}"`
       ].join(','))
@@ -557,6 +568,9 @@ export default function BarInventoryPage() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Critical
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Last Updated
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -611,6 +625,15 @@ export default function BarInventoryPage() {
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
                         {getStatusIcon(item.status)}
                         <span className="ml-1 capitalize">{item.status}</span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        item.is_critical === false 
+                          ? 'bg-gray-100 text-gray-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {item.is_critical === false ? 'Optional' : 'Critical'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -788,6 +811,28 @@ export default function BarInventoryPage() {
                 </p>
               </div>
 
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="is_critical"
+                  name="is_critical"
+                  checked={formData.is_critical}
+                  onChange={handleInputChange}
+                  className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+                />
+                <div className="flex-1">
+                  <label htmlFor="is_critical" className="text-sm font-medium text-gray-700">
+                    Critical Ingredient
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    If marked as critical, drinks requiring this ingredient will be unavailable when out of stock
+                  </p>
+                </div>
+                <div className="text-purple-600">
+                  {formData.is_critical ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Notes
@@ -956,6 +1001,28 @@ export default function BarInventoryPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Alert will be shown when quantity falls below this threshold
                 </p>
+              </div>
+
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="edit_is_critical"
+                  name="is_critical"
+                  checked={formData.is_critical}
+                  onChange={handleInputChange}
+                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <div className="flex-1">
+                  <label htmlFor="edit_is_critical" className="text-sm font-medium text-gray-700">
+                    Critical Ingredient
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    If marked as critical, drinks requiring this ingredient will be unavailable when out of stock
+                  </p>
+                </div>
+                <div className="text-blue-600">
+                  {formData.is_critical ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                </div>
               </div>
 
               <div>

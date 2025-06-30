@@ -97,4 +97,6 @@ export interface InventoryItem {
   threshold: number;
   last_updated: string;
   notes?: string;
+  status?: 'sufficient' | 'low' | 'critical';
+  is_critical?: boolean;
 }

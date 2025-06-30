@@ -220,10 +220,20 @@ export default function BarDashboard() {
         completedToday: completedDrinks.length 
       }));
 
-      // Get low stock items count (mock data for now)
+      // Get low stock items count
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .or('status.eq.low,status.eq.critical');
+        
+      if (inventoryError) {
+        console.error('Error loading inventory stats:', inventoryError);
+        return;
+      }
+      
       setStats(prev => ({
         ...prev,
-        lowStockItems: 3
+        lowStockItems: inventoryData?.length || 0
       }));
 
     } catch (error) {
@@ -235,6 +245,60 @@ export default function BarDashboard() {
     try {
       console.log('Updating drink status:', itemId, 'to', status);
 
+      // Get the order item to access its menu_item
+      const { data: orderItem, error: itemError } = await supabase
+        .from('order_items')
+        .select('*, menu_item:menu_items(*)')
+        .eq('id', itemId)
+        .single();
+        
+      if (itemError) {
+        console.error('Error fetching order item:', itemError);
+        return;
+      }
+      
+      // Update inventory if needed
+      if (status === 'ready' && orderItem.menu_item && orderItem.menu_item.required_inventory) {
+        console.log('Updating inventory for required ingredients:', orderItem.menu_item.required_inventory);
+        
+        // Get inventory items for these ingredients
+        const { data: inventoryItems, error: invError } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .in('name', orderItem.menu_item.required_inventory);
+          
+        if (invError) {
+          console.error('Error fetching inventory items:', invError);
+        } else {
+          // Update each inventory item
+          for (const item of inventoryItems || []) {
+            // Skip non-critical ingredients that are already at 0
+            if (item.is_critical === false && item.quantity <= 0) {
+              console.log(`Skipping non-critical ingredient ${item.name} that is already at 0`);
+              continue;
+            }
+            
+            // Reduce quantity by 1 (or to 0 for non-critical items)
+            const newQuantity = Math.max(0, item.quantity - 1);
+            
+            const { error: updateError } = await supabase
+              .from('inventory_items')
+              .update({
+                quantity: newQuantity,
+                last_updated: new Date().toISOString()
+              })
+              .eq('id', item.id);
+              
+            if (updateError) {
+              console.error(`Error updating inventory for ${item.name}:`, updateError);
+            } else {
+              console.log(`Updated inventory for ${item.name}: ${item.quantity} -> ${newQuantity}`);
+            }
+          }
+        }
+      }
+
+      // Update the order item status
       const { error } = await supabase
         .from('order_items')
         .update({ status })
@@ -543,10 +607,12 @@ export default function BarDashboard() {
               <div>
                 <p>• Mark drinks as "In Progress" when you start preparing</p>
                 <p>• Use "Ready" status when drinks are complete</p>
+                <p>• Non-critical ingredients won't block preparation</p>
               </div>
               <div>
                 <p>• Sound notifications alert you to new orders</p>
                 <p>• Status updates sync with waiter dashboards</p>
+                <p>• Critical ingredients are tracked in inventory</p>
               </div>
             </div>
           </div>

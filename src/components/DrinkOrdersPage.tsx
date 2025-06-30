@@ -193,7 +193,11 @@ export default function DrinkOrdersPage() {
           if (item.menu_item && item.menu_item.required_inventory && item.menu_item.required_inventory.length > 0) {
             canPrepare = item.menu_item.required_inventory.every(ingredientName => {
               const inventoryItem = inventoryItems.find(invItem => invItem.name === ingredientName);
-              return inventoryItem && inventoryItem.quantity > 0;
+              
+              // If ingredient is not critical or has stock, it's available
+              return !inventoryItem || 
+                     inventoryItem.is_critical === false || 
+                     inventoryItem.quantity > 0;
             });
           }
           
@@ -251,20 +255,30 @@ export default function DrinkOrdersPage() {
           const inventoryItem = inventoryItems[0];
           
           // Only consume if we're marking as ready and have enough quantity
-          if (consumeInventory && inventoryItem.quantity > 0) {
-            // Reduce inventory by 1 unit
-            const { error: updateError } = await supabase
-              .from('inventory_items')
-              .update({ 
-                quantity: Math.max(0, inventoryItem.quantity - 1),
-                last_updated: new Date().toISOString()
-              })
-              .eq('id', inventoryItem.id);
-              
-            if (updateError) {
-              console.error(`Error updating inventory for ${ingredientName}:`, updateError);
-            } else {
-              console.log(`Consumed 1 unit of ${ingredientName} from inventory`);
+          // Skip consumption for non-critical ingredients if they're out of stock
+          if (consumeInventory && 
+              (inventoryItem.quantity > 0 || inventoryItem.is_critical === false)) {
+            
+            // If it's a critical ingredient with quantity > 0 or a non-critical ingredient, update it
+            if (inventoryItem.quantity > 0 || inventoryItem.is_critical === false) {
+              // For non-critical ingredients, don't reduce below 0
+              const newQuantity = inventoryItem.is_critical === false 
+                ? Math.max(0, inventoryItem.quantity - 1)
+                : inventoryItem.quantity - 1;
+                
+              const { error: updateError } = await supabase
+                .from('inventory_items')
+                .update({ 
+                  quantity: newQuantity,
+                  last_updated: new Date().toISOString()
+                })
+                .eq('id', inventoryItem.id);
+                
+              if (updateError) {
+                console.error(`Error updating inventory for ${ingredientName}:`, updateError);
+              } else {
+                console.log(`Consumed 1 unit of ${ingredientName} from inventory`);
+              }
             }
           }
         }
@@ -457,7 +471,7 @@ export default function DrinkOrdersPage() {
                               </span>
                               {!canPrepare && (
                                 <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
-                                  Missing ingredients
+                                  Missing critical ingredients
                                 </span>
                               )}
                             </div>
@@ -469,9 +483,9 @@ export default function DrinkOrdersPage() {
                             {/* Show missing ingredients */}
                             {!canPrepare && item.menu_item?.required_inventory && (
                               <div className="mt-1 text-xs text-red-600">
-                                Missing: {item.menu_item.required_inventory.filter(ingredientName => {
+                                Missing critical: {item.menu_item.required_inventory.filter(ingredientName => {
                                   const inventoryItem = inventoryItems.find(invItem => invItem.name === ingredientName);
-                                  return !inventoryItem || inventoryItem.quantity <= 0;
+                                  return inventoryItem && inventoryItem.is_critical !== false && inventoryItem.quantity <= 0;
                                 }).join(', ')}
                               </div>
                             )}
@@ -493,7 +507,7 @@ export default function DrinkOrdersPage() {
                                       ? 'bg-blue-600 hover:bg-blue-700' 
                                       : 'bg-gray-400 cursor-not-allowed'
                                   } transition-colors`}
-                                  title={canPrepare ? t('bar.start') : 'Missing ingredients'}
+                                  title={canPrepare ? t('bar.start') : 'Missing critical ingredients'}
                                 >
                                   {t('bar.start')}
                                 </button>
@@ -507,7 +521,7 @@ export default function DrinkOrdersPage() {
                                       ? 'bg-green-600 hover:bg-green-700' 
                                       : 'bg-gray-400 cursor-not-allowed'
                                   } transition-colors`}
-                                  title={canPrepare ? t('bar.ready') : 'Missing ingredients'}
+                                  title={canPrepare ? t('bar.ready') : 'Missing critical ingredients'}
                                 >
                                   {t('bar.ready')}
                                 </button>
